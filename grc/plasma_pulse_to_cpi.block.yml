@@ -1,0 +1,36 @@
+id: plasma_pulse_to_cpi
+label: Pulse to CPI
+category: '[plasma]/PDU'
+
+parameters:
+- id: n_pulse_cpi
+  label: Pulses per CPI
+  dtype: int
+  default: 128
+# Metadata keys
+- id: n_pulse_cpi_key
+  label: Pulses per CPI Key
+  dtype: string
+  default: radar:n_pulse_cpi
+  category: Metadata
+  hide: part
+
+inputs:
+- id: in
+  domain: message
+
+outputs:
+- id: out
+  domain: message
+  optional: true
+
+templates:
+  imports: from gnuradio import plasma
+  make: |-
+    plasma.pulse_to_cpi(${n_pulse_cpi})
+    self.${id}.init_meta_dict(${n_pulse_cpi_key})
+
+
+#  'file_format' specifies the version of the GRC yml format used in the file
+#  and should usually not be changed.
+file_format: 1

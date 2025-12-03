@@ -1,0 +1,46 @@
+id: plasma_freq_step_controller
+label: Frequency Step Controller
+category: "[plasma]"
+
+parameters:
+  - id: start_freq
+    label: Start Frequency
+    dtype: float
+  - id: stop_freq
+    label: Stop Frequency
+    dtype: float
+  - id: step_freq
+    label: Step Frequency
+    dtype: float
+  - id: cyclic
+    label: Loop
+    dtype: bool
+    options: [False, True]
+    default: True
+  - id: tx_freq_key
+    label: Tx Frequency Key
+    dtype: string
+    default: core:tx_freq
+    category: Metadata
+    hide: part
+
+inputs:
+  - id: in
+    domain: message
+    optional: true
+
+outputs:
+  - id: out
+    domain: message
+    optional: true
+  - id: ctrl
+    domain: message
+    optional: true
+
+templates:
+  imports: from gnuradio import plasma
+  make: |-
+    plasma.freq_step_controller(${start_freq}, ${stop_freq}, ${step_freq}, ${cyclic})
+    self.${id}.init_meta_dict(${tx_freq_key})
+
+file_format: 1

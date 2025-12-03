@@ -1,0 +1,54 @@
+id: plasma_sweep_collector
+label: Sweep Collector
+category: '[plasma]/PDU'
+
+documentation: |
+  Collects PDU data organized by frequency. After receiving echoes for all expected
+  frequencies in a sweep, writes the collected data to a binary file.
+
+templates:
+  imports: from gnuradio import plasma
+  make: plasma.sweep_collector(${output_prefix}, ${output_dir}, ${save_cycles}, ${sweep_start}, ${sweep_stop}, ${sweep_step}, ${freq_key})
+
+parameters:
+  - id: output_prefix
+    label: Output File Prefix
+    dtype: string
+    default: '"sweep"'
+  - id: sweep_start
+    label: Sweep Start Frequency (Hz)
+    dtype: float
+    default: 1e9
+  - id: sweep_stop
+    label: Sweep Stop Frequency (Hz)
+    dtype: float
+    default: 1.1e9
+  - id: sweep_step
+    label: Sweep Step Frequency (Hz)
+    dtype: float
+    default: 1e6
+  - id: freq_key
+    label: Frequency Metadata Key
+    dtype: string
+    default: '"rx_freq"'
+    category: Metadata
+  - id: output_dir
+    label: Output Directory (choose folder or type path)
+    dtype: file_save
+    default: '"."'
+  - id: save_cycles
+    label: Number of Sweeps to Collect (then stop)
+    dtype: int
+    default: 1
+
+inputs:
+  - id: in
+    domain: message
+    optional: false
+
+outputs: []
+
+#  'file_format' specifies the version of the GRC yml format used in the file
+#  and should usually not be changed.
+file_format: 1
+

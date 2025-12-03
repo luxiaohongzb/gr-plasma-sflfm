@@ -1,0 +1,46 @@
+id: plasma_waveform_controller
+label: Waveform Controller
+category: "[plasma]"
+
+templates:
+  imports: from gnuradio import plasma
+  make: plasma.waveform_controller(${prf}, ${samp_rate})
+
+parameters:
+  - id: prf
+    label: PRF
+    dtype: float
+  - id: samp_rate
+    label: Sample Rate
+    dtype: float
+  # Metadata dictionary keys
+  - id: prf_key
+    label: PRF Key
+    dtype: string
+    default: "radar:prf"
+    category: Metadata
+    hide: part
+  - id: samp_rate_key
+    label: Sample Rate Key
+    dtype: string
+    default: "core:sample_rate"
+    category: Metadata
+    hide: part
+
+inputs:
+  - label: in
+    id: in
+    domain: message
+
+outputs:
+  - label: out
+    id: out
+    domain: message
+    optional: true
+
+templates:
+  imports: from gnuradio import plasma
+  make: |-
+    plasma.waveform_controller(${prf}, ${samp_rate})
+    self.${id}.init_meta_dict(${prf_key}, ${samp_rate_key})
+file_format: 1
