@@ -24,3 +24,32 @@ const size_t RangeDopplerUpdateEvent::rows() { return d_rows; }
 double* RangeDopplerUpdateEvent::data() { return d_data; }
 
 const pmt::pmt_t RangeDopplerUpdateEvent::meta() { return d_meta; }
+
+// RangeProfileUpdateEvent implementation
+RangeProfileUpdateEvent::RangeProfileUpdateEvent()
+    : QEvent(QEvent::Type(RangeProfileUpdateEventType)), d_num_samples(0)
+{
+}
+
+RangeProfileUpdateEvent::~RangeProfileUpdateEvent() {}
+
+void RangeProfileUpdateEvent::setNumSamples(size_t n) { d_num_samples = n; }
+
+void RangeProfileUpdateEvent::setRangeProfile(const std::vector<double>& range_axis,
+                                              const std::vector<double>& profile)
+{
+    d_range_axis = range_axis;
+    d_profile = profile;
+}
+
+const std::vector<double>& RangeProfileUpdateEvent::getRangeAxis() const
+{
+    return d_range_axis;
+}
+
+const std::vector<double>& RangeProfileUpdateEvent::getProfile() const
+{
+    return d_profile;
+}
+
+size_t RangeProfileUpdateEvent::getNumSamples() const { return d_num_samples; }

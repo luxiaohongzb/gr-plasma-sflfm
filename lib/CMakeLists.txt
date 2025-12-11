@@ -31,6 +31,10 @@ list(APPEND plasma_sources
     pdu_file_source_impl.cc
     pulse_doppler_impl.cc
     cw_to_pulsed_impl.cc
+    ifft_range_profile_impl.cc
+    ifft_range_profile_impl.h
+    ifft_range_profile_window.cc
+    ifft_range_profile_window.h
 
     )
 
@@ -44,6 +48,7 @@ add_library(gnuradio-plasma ${plasma_sources})
 target_link_libraries(gnuradio-plasma 
     PUBLIC
     gnuradio::gnuradio-runtime
+    gnuradio::gnuradio-fft
     Qt5::Widgets
     qwt::qwt
     Python::Python

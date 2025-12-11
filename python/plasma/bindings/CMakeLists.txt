@@ -56,6 +56,7 @@ list(APPEND plasma_python_files
     usrp_radar_python.cc
     waveform_controller_python.cc
     device_python.cc
+    ifft_range_profile_python.cc
     
   
 )

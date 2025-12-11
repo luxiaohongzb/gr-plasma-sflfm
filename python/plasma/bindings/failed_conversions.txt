@@ -1,2 +1,3 @@
 ./include/gnuradio/plasma/cfar2D.hNo c++ parser found. Please install castxml.
 ./include/gnuradio/plasma/freq_step_controller.hError occurred while running CASTXML xml file does not exist
+./include/gnuradio/plasma/ifft_range_profile.hError occurred while running CASTXML xml file does not exist

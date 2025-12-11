@@ -33,11 +33,11 @@ parameters:
     default: '"rx_freq"'
     category: Metadata
   - id: output_dir
-    label: Output Directory (choose folder or type path)
+    label: Output Directory
     dtype: file_save
     default: '"."'
   - id: save_cycles
-    label: Number of Sweeps to Collect (then stop)
+    label: Number of Sweeps to Collect
     dtype: int
     default: 1
 
@@ -46,7 +46,10 @@ inputs:
     domain: message
     optional: false
 
-outputs: []
+outputs:
+  - id: out
+    domain: message
+    optional: true
 
 #  'file_format' specifies the version of the GRC yml format used in the file
 #  and should usually not be changed.

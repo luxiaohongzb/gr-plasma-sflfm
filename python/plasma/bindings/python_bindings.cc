@@ -39,6 +39,7 @@ namespace py = pybind11;
     void bind_sweep_collector(py::module& m);
     void bind_cw_to_pulsed(py::module& m);
     void bind_freq_step_controller(py::module& m);
+    void bind_ifft_range_profile(py::module& m);
  //   void bind_simulate_rx(py::module& m);
 // ) END BINDING_FUNCTION_PROTOTYPES
 
@@ -85,6 +86,7 @@ PYBIND11_MODULE(plasma_python, m)
     bind_pulse_doppler(m);
     bind_sweep_collector(m);
     bind_cw_to_pulsed(m);
+    bind_ifft_range_profile(m);
    // bind_freq_step_controller(m);
     //bind_simulate_rx(m);
 }

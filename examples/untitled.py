@@ -20,16 +20,17 @@ if __name__ == '__main__':
         except:
             print("Warning: failed to XInitThreads()")
 
+from PyQt5 import Qt
+from gnuradio import plasma
+import sip
 from gnuradio import gr
 from gnuradio.filter import firdes
 from gnuradio.fft import window
 import sys
 import signal
-from PyQt5 import Qt
 from argparse import ArgumentParser
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio import eng_notation
-from gnuradio import plasma
 
 
 
@@ -71,21 +72,26 @@ class untitled(gr.top_block, Qt.QWidget):
         ##################################################
         # Variables
         ##################################################
-        self.step = step = 40000000.0
-        self.start_freq = start_freq = 2.3e9
-        self.samp_rate = samp_rate = 40000000.0
+        self.step = step = 30000000.0
+        self.start_freq = start_freq = 3000000000.0
+        self.samp_rate = samp_rate = 60000000.0
         self.n_pulse_cpi = n_pulse_cpi = 128
-        self.end_freq = end_freq = 2700000000.0
-        self.bandwidth = bandwidth = 20000000.0
+        self.end_freq = end_freq = 3300000000.0
+        self.bandwidth = bandwidth = 30000000.0
 
         ##################################################
         # Blocks
         ##################################################
         self.plasma_usrp_radar_0 = plasma.usrp_radar('addr=192.168.40.2', samp_rate, samp_rate, 2.4e9, 2.4e9, 10, 10, 0.5, True, '', True, start_freq, end_freq, step, 1)
         self.plasma_usrp_radar_0.set_metadata_keys('core:tx_freq', 'core:rx_freq', 'core:sample_start')
-        self.plasma_sweep_collector_0 = plasma.sweep_collector("sweep", ".", 10, start_freq, end_freq, step, 'core:rx_freq')
+        self.plasma_sweep_collector_0 = plasma.sweep_collector("sweep", '/home/mingliu/Documents/gr-plasma/tools/data/test5', 3, start_freq, end_freq, step, 'core:rx_freq')
         self.plasma_lfm_source_0 = plasma.lfm_source(bandwidth, -bandwidth/2, 10e-6, samp_rate, 0)
         self.plasma_lfm_source_0.init_meta_dict('radar:bandwidth', 'radar:start_freq', 'radar:duration', 'core:sample_rate', 'core:label', 'radar:prf')
+        self.plasma_ifft_range_profile_0 = plasma.ifft_range_profile(30e6, 10e-6, samp_rate, 1e3, start_freq, end_freq, step, 'core:rx_freq', 256)
+        self.plasma_ifft_range_profile_0.set_dynamic_range(60)
+        self.plasma_ifft_range_profile_0.set_msg_queue_depth(100)
+        self._plasma_ifft_range_profile_0_win = sip.wrapinstance(self.plasma_ifft_range_profile_0.pyqwidget(), Qt.QWidget)
+        self.top_layout.addWidget(self._plasma_ifft_range_profile_0_win)
         self.plasma_cw_to_pulsed_0 = plasma.cw_to_pulsed(1e3, samp_rate)
         self.plasma_cw_to_pulsed_0.init_meta_dict('core:sample_rate', 'radar:prf')
 
@@ -95,6 +101,7 @@ class untitled(gr.top_block, Qt.QWidget):
         ##################################################
         self.msg_connect((self.plasma_cw_to_pulsed_0, 'out'), (self.plasma_usrp_radar_0, 'in'))
         self.msg_connect((self.plasma_lfm_source_0, 'out'), (self.plasma_cw_to_pulsed_0, 'in'))
+        self.msg_connect((self.plasma_sweep_collector_0, 'out'), (self.plasma_ifft_range_profile_0, 'in'))
         self.msg_connect((self.plasma_usrp_radar_0, 'out'), (self.plasma_sweep_collector_0, 'in'))
 
 

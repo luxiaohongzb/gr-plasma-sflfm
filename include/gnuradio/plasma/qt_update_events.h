@@ -7,6 +7,7 @@
 #include <vector>
 
 static constexpr int RadarUpdateEventType = 4096;
+static constexpr int RangeProfileUpdateEventType = 4097;
 
 class RangeDopplerUpdateEvent : public QEvent
 {
@@ -27,6 +28,28 @@ private:
     size_t d_rows;
     size_t d_cols;
     pmt::pmt_t d_meta;
+};
+
+class RangeProfileUpdateEvent : public QEvent
+{
+public:
+    RangeProfileUpdateEvent();
+    ~RangeProfileUpdateEvent() override;
+    
+    void setNumSamples(size_t n);
+    void setRangeProfile(const std::vector<double>& range_axis, 
+                        const std::vector<double>& profile);
+    
+    const std::vector<double>& getRangeAxis() const;
+    const std::vector<double>& getProfile() const;
+    size_t getNumSamples() const;
+    
+    static QEvent::Type Type() { return QEvent::Type(RangeProfileUpdateEventType); }
+
+private:
+    std::vector<double> d_range_axis;
+    std::vector<double> d_profile;
+    size_t d_num_samples;
 };
 
 #endif /* C74FE057_CBE3_4619_B18E_7A7AE942711F */

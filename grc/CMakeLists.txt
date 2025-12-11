@@ -22,5 +22,6 @@ install(FILES
     plasma_cw_to_pulsed.block.yml
     plasma_sweep_collector.block.yml
     plasma_freq_step_controller.block.yml
+    plasma_ifft_range_profile.block.yml
     DESTINATION share/gnuradio/grc/blocks
 )

@@ -30,6 +30,7 @@ install(FILES
     pulse_doppler.h
     cw_to_pulsed.h
     sweep_collector.h
+    ifft_range_profile.h
 
     DESTINATION include/gnuradio/plasma
 )
