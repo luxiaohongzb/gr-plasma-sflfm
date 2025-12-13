@@ -8,6 +8,7 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QLabel>
+#include <QColor>
 #include <iostream>
 #include <algorithm>
 
@@ -34,31 +35,15 @@ IFFTRangeProfileWindow::IFFTRangeProfileWindow(QWidget* parent,
     d_main_layout = new QVBoxLayout(this);
     d_plot_layout = new QHBoxLayout();
 
-    // 创建高分辨率距离像绘图
-    d_plot = new QwtPlot(this);
-    d_plot->setTitle("高分辨率距离像 (HRRP)");
-    d_plot->setAxisTitle(QwtPlot::xBottom, "距离 (m)");
-    d_plot->setAxisTitle(QwtPlot::yLeft, "幅度");
-    d_plot->setCanvasBackground(Qt::white);
+    // 创建高分辨率距离像绘图（使用通用组件）
+    d_plot = new RangePlotWidget("高分辨率距离像 (HRRP)", "距离 (m)", "幅度", this);
+    d_plot->setCurveColor(Qt::blue);
+    d_plot->setCurveName("HRRP");
 
-    // 创建曲线
-    d_curve = new QwtPlotCurve("HRRP");
-    d_curve->setPen(QPen(Qt::blue, 2));
-    d_curve->setRenderHint(QwtPlotItem::RenderAntialiased, true);
-    d_curve->attach(d_plot);
-
-    // 创建网格
-    d_grid = new QwtPlotGrid();
-    d_grid->setPen(QPen(Qt::gray, 0, Qt::DotLine));
-    d_grid->attach(d_plot);
-
-    // 创建缩放和平移工具
-    d_zoomer = new QwtPlotZoomer(d_plot->canvas());
-    d_zoomer->setRubberBandPen(QPen(Qt::red, 2, Qt::DotLine));
-    d_zoomer->setTrackerPen(QPen(Qt::black));
-
-    d_panner = new QwtPlotPanner(d_plot->canvas());
-    d_panner->setAxisEnabled(QwtPlot::yRight, false);
+    // 创建脉冲压缩结果绘图（使用通用组件）
+    d_pc_plot = new RangePlotWidget("脉冲压缩结果", "距离 (m)", "幅度", this);
+    d_pc_plot->setCurveColor(Qt::green);
+    d_pc_plot->setCurveName("Pulse Compression");
 
     // 创建状态标签
     d_status_label = new QLabel("等待数据...", this);
@@ -66,6 +51,7 @@ IFFTRangeProfileWindow::IFFTRangeProfileWindow(QWidget* parent,
 
     // 添加到布局
     d_plot_layout->addWidget(d_plot);
+    d_plot_layout->addWidget(d_pc_plot);
     d_main_layout->addLayout(d_plot_layout);
     d_main_layout->addWidget(d_status_label);
 
@@ -77,6 +63,7 @@ IFFTRangeProfileWindow::IFFTRangeProfileWindow(QWidget* parent,
 IFFTRangeProfileWindow::~IFFTRangeProfileWindow()
 {
     d_closed = true;
+    // Qt 会自动清理子对象
 }
 
 bool IFFTRangeProfileWindow::is_closed() const { return d_closed; }
@@ -85,14 +72,12 @@ bool IFFTRangeProfileWindow::busy() const { return d_busy; }
 
 void IFFTRangeProfileWindow::set_x_axis_range(double x_min, double x_max)
 {
-    d_plot->setAxisScale(QwtPlot::xBottom, x_min, x_max);
-    d_plot->replot();
+    d_plot->setXAxisRange(x_min, x_max);
 }
 
 void IFFTRangeProfileWindow::set_y_axis_range(double y_min, double y_max)
 {
-    d_plot->setAxisScale(QwtPlot::yLeft, y_min, y_max);
-    d_plot->replot();
+    d_plot->setYAxisRange(y_min, y_max);
 }
 
 void IFFTRangeProfileWindow::customEvent(QEvent* e)
@@ -110,59 +95,50 @@ void IFFTRangeProfileWindow::customEvent(QEvent* e)
             return;
         }
 
-        // 转换为QVector
-        d_x_data.clear();
-        d_y_data.clear();
-        
-        for (size_t i = 0; i < range_axis.size(); i++) {
-            d_x_data.append(range_axis[i]);
-            d_y_data.append(profile[i]);
-        }
-
-        // 更新曲线数据
-        d_curve->setSamples(d_x_data, d_y_data);
-
-        // 自动调整Y轴范围
-        if (!d_y_data.isEmpty()) {
-            double max_val = *std::max_element(d_y_data.begin(), d_y_data.end());
-            double min_val = *std::min_element(d_y_data.begin(), d_y_data.end());
-            double margin = (max_val - min_val) * 0.1;
-            d_plot->setAxisScale(QwtPlot::yLeft, 
-                               std::max(0.0, min_val - margin), 
-                               max_val + margin);
-        }
-
-        // 更新X轴范围
-        if (!d_x_data.isEmpty()) {
-            double x_min = d_x_data.first();
-            double x_max = d_x_data.last();
-            d_plot->setAxisScale(QwtPlot::xBottom, x_min, x_max);
-        }
+        // 使用通用组件更新数据
+        d_plot->updateData(range_axis, profile);
 
         // 更新状态标签
         QString status = QString("接收到 %1 个距离点").arg(range_axis.size());
-        if (!d_x_data.isEmpty()) {
+        if (!range_axis.empty()) {
             status += QString(" | 距离范围: %.2f - %.2f m")
-                     .arg(d_x_data.first())
-                     .arg(d_x_data.last());
+                     .arg(range_axis.front())
+                     .arg(range_axis.back());
         }
         d_status_label->setText(status);
-
-        // 重绘
-        d_plot->replot();
-        d_zoomer->setZoomBase();
 
         d_busy = false;
         
         std::cout << "[IFFTRangeProfileWindow] Updated plot with " 
                   << range_axis.size() << " points" << std::endl;
+    } else if (e->type() == PulseCompressionUpdateEvent::Type()) {
+        d_busy = true;
+
+        PulseCompressionUpdateEvent* event = static_cast<PulseCompressionUpdateEvent*>(e);
+        
+        const std::vector<double>& range_axis = event->getRangeAxis();
+        const std::vector<double>& profile = event->getProfile();
+        double frequency = event->getFrequency();
+        
+        if (range_axis.empty() || profile.empty()) {
+            d_busy = false;
+            return;
+        }
+
+        // 更新标题显示频率
+        QString title = QString("脉冲压缩结果 (频率: %.3f GHz)").arg(frequency / 1e9);
+        d_pc_plot->setTitle(title);
+
+        // 使用通用组件更新数据
+        d_pc_plot->updateData(range_axis, profile);
+
+        d_busy = false;
+        
+        std::cout << "[IFFTRangeProfileWindow] Updated pulse compression plot with " 
+                  << range_axis.size() << " points at " << frequency / 1e9 << " GHz" << std::endl;
     }
 }
 
-void IFFTRangeProfileWindow::update_plot()
-{
-    d_plot->replot();
-}
 
 } // namespace plasma
 } // namespace gr

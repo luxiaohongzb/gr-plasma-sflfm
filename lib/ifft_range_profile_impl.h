@@ -8,7 +8,10 @@
 
 #include "ifft_range_profile_window.h"
 #include <gnuradio/plasma/ifft_range_profile.h>
-#include <gnuradio/fft/fft.h>
+#include <gnuradio/plasma/device.h>
+#include <arrayfire.h>
+#include <plasma_dsp/fft.h>
+#include <plasma_dsp/lfm.h>
 #include <QApplication>
 #include <QWidget>
 #include <map>
@@ -46,11 +49,16 @@ private:
     std::map<double, std::vector<gr_complex>> d_freq_data;
     std::vector<double> d_expected_freqs;
     
+    // ArrayFire backend
+    af::Backend d_backend;
+    af::array d_match_filt;  // Matched filter for pulse compression
+    
     // Message handling
     pmt::pmt_t d_in_port;
     size_t d_msg_queue_depth;
     std::atomic<bool> d_finished;
-    std::atomic<bool> d_processing;
+    std::atomic<bool> d_processing;  // 用于扫频完成处理
+    std::atomic<int> d_pc_processing_count;  // 用于跟踪正在处理的脉冲压缩数量
 
     // Constants
     static constexpr double SPEED_OF_LIGHT = 3e8;
@@ -91,6 +99,10 @@ public:
     void handle_rx_msg(pmt::pmt_t msg);
     void set_dynamic_range(const double) override;
     void set_msg_queue_depth(size_t) override;
+    void set_backend(Device::Backend) override;
+    
+    // Helper function to update matched filter when parameters change
+    void update_matched_filter();
 };
 
 } // namespace plasma

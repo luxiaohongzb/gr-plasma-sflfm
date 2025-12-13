@@ -223,10 +223,14 @@
      const gr_complex *data = vec_data.data();
      if (n > 0) {
          size_t show = std::min<size_t>(4, n);
-         std::cout << "[sweep_collector] first " << show << " samples: ";
-         for (size_t i = 0; i < show; ++i) {
-             std::cout << "(" << std::real(data[i]) << "," << std::imag(data[i]) << ") ";
-         }
+        //  std::cout << "[sweep_collector] first " << show << " samples: ";
+
+
+
+
+        //  for (size_t i = 0; i < show; ++i) {
+        //      std::cout << "(" << std::real(data[i]) << "," << std::imag(data[i]) << ") ";
+        //  }
          std::cout << std::endl;
      }
  
@@ -256,4 +260,5 @@
  
  } // namespace plasma
  } // namespace gr
+ 
  

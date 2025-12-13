@@ -71,6 +71,26 @@ parameters:
     label: LO Stabilize (s)
     dtype: float
     default: 0.02
+  - id: clock_source
+    label: Clock Source
+    dtype: enum
+    options: ['internal', 'external', 'gpsdo', 'mimo']
+    option_labels: [Internal, External, GPSDO, MIMO]
+    default: 'internal'
+    hide: part
+  - id: time_source
+    label: Time Source
+    dtype: enum
+    options: ['internal', 'external', 'gpsdo', 'mimo']
+    option_labels: [Internal, External, GPSDO, MIMO]
+    default: 'internal'
+    hide: part
+  - id: freq_mode
+    label: Frequency Mode
+    dtype: enum
+    options: ['hop', 'single']
+    option_labels: [Frequency Hopping, Single Frequency]
+    default: 'hop'
   # Metadata keys
   - id: tx_freq_key
     label: Tx frequency key
@@ -104,7 +124,7 @@ outputs:
 templates:
   imports: from gnuradio import plasma
   make: |-
-    plasma.usrp_radar(${args}, ${samp_rate}, ${samp_rate}, ${tx_freq}, ${rx_freq}, ${tx_gain}, ${rx_gain}, ${start_delay}, ${elevate_priority}, ${cal_file}, ${verbose}, ${hop_start_freq}, ${hop_end_freq}, ${hop_step}, ${lo_stabilize_time})
+    plasma.usrp_radar(${args}, ${samp_rate}, ${samp_rate}, ${tx_freq}, ${rx_freq}, ${tx_gain}, ${rx_gain}, ${start_delay}, ${elevate_priority}, ${cal_file}, ${verbose}, ${hop_start_freq}, ${hop_end_freq}, ${hop_step}, ${lo_stabilize_time}, '${clock_source}', '${time_source}', '${freq_mode}')
     self.${id}.set_metadata_keys(${tx_freq_key}, ${rx_freq_key}, ${sample_start_key})
     
 

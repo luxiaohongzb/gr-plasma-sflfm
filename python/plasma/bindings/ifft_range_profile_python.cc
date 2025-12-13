@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(ifft_range_profile.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(140ff86aada227f07a120890cc990add)                     */
+/* BINDTOOL_HEADER_FILE_HASH(6db57500ee4f45f1a88407e128e82289)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -24,6 +24,7 @@
 namespace py = pybind11;
 
 #include <QWidget>
+#include <Python.h>
 #include <gnuradio/plasma/ifft_range_profile.h>
 // pydoc.h is automatically generated in the build directory
 // #include <ifft_range_profile_pydoc.h>
@@ -61,7 +62,10 @@ void bind_ifft_range_profile(py::module& m)
 
 
         
-        .def("exec_", &ifft_range_profile::exec_, D(ifft_range_profile, exec_))
+        .def("exec_",&ifft_range_profile::exec_,       
+            D(ifft_range_profile,exec_)
+        )
+
 
         
         .def(
@@ -91,6 +95,13 @@ void bind_ifft_range_profile(py::module& m)
         .def("set_msg_queue_depth",&ifft_range_profile::set_msg_queue_depth,       
             py::arg("depth"),
             D(ifft_range_profile,set_msg_queue_depth)
+        )
+
+
+        
+        .def("set_backend",&ifft_range_profile::set_backend,       
+            py::arg("arg0"),
+            D(ifft_range_profile,set_backend)
         )
 
         ;

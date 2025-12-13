@@ -24,7 +24,10 @@ usrp_radar::sptr usrp_radar::make(const std::string& args,
                                   const double hop_start_freq,
                                   const double hop_end_freq,
                                   const double hop_step,
-                                  const double lo_stabilize_time)
+                                  const double lo_stabilize_time,
+                                  const std::string& clock_source,
+                                  const std::string& time_source,
+                                  const std::string& freq_mode)
 {
     return gnuradio::make_block_sptr<usrp_radar_impl>(args,
                                                       tx_rate,
@@ -40,7 +43,10 @@ usrp_radar::sptr usrp_radar::make(const std::string& args,
                                                       hop_start_freq,
                                                       hop_end_freq,
                                                       hop_step,
-                                                      lo_stabilize_time);
+                                                      lo_stabilize_time,
+                                                      clock_source,
+                                                      time_source,
+                                                      freq_mode);
 }
 
 usrp_radar_impl::usrp_radar_impl(const std::string& args,
@@ -57,7 +63,10 @@ usrp_radar_impl::usrp_radar_impl(const std::string& args,
                                  const double hop_start_freq,
                                  const double hop_end_freq,
                                  const double hop_step,
-                                 const double lo_stabilize_time)
+                                 const double lo_stabilize_time,
+                                 const std::string& clock_source,
+                                 const std::string& time_source,
+                                 const std::string& freq_mode)
     : gr::block(
           "usrp_radar", gr::io_signature::make(0, 0, 0), gr::io_signature::make(0, 0, 0)),
       usrp_args(args),
@@ -74,7 +83,10 @@ usrp_radar_impl::usrp_radar_impl(const std::string& args,
       hop_start_freq(hop_start_freq),
       hop_end_freq(hop_end_freq),
       hop_step(hop_step),
-      lo_stabilize_time(lo_stabilize_time)
+      lo_stabilize_time(lo_stabilize_time),
+      clock_source(clock_source),
+      time_source(time_source),
+      freq_mode(freq_mode)
 {
     // Additional parameters. I have the hooks in to make them configurable, but we don't
     // need them right now.
@@ -105,7 +117,9 @@ usrp_radar_impl::usrp_radar_impl(const std::string& args,
                 this->rx_gain,
                 this->tx_subdev,
                 this->rx_subdev,
-                this->verbose);
+                this->verbose,
+                this->clock_source,
+                this->time_source);
 
     n_delay = 0;
     if (not cal_file.empty()) {
@@ -195,18 +209,110 @@ void usrp_radar_impl::run()
         std::cout << boost::format("[usrp_radar TX] thread created, start_time=%.6f has_time_spec=%d") % start_time % (int)tx_has_time_spec << std::endl;
     }
 
-    std::vector<double> freqs;
-    if (hop_step > 0) {
-        for (double f = hop_start_freq; f <= hop_end_freq + 1e-9; f += hop_step) freqs.push_back(f);
-    } else if (hop_step < 0) {
-        for (double f = hop_start_freq; f >= hop_end_freq - 1e-9; f += hop_step) freqs.push_back(f);
-    } else {
-        freqs.push_back(tx_freq);
-    }
-
-    if (freqs.size() > 1) {
-        // Cycle through frequencies repeatedly until finished is set
+    if (freq_mode == "single") {
+        // Single frequency mode: set frequency once and continuously transmit
+        double now_dev = usrp->get_time_now().get_real_secs();
+        double t_cmd = now_dev + 0.02;
+        usrp->set_command_time(uhd::time_spec_t(t_cmd));
+        usrp->set_tx_freq(tx_freq);
+        usrp->set_rx_freq(rx_freq);
+        usrp->clear_command_time();
+        if (verbose) {
+            double actual_tx = usrp->get_tx_freq();
+            double actual_rx = usrp->get_rx_freq();
+            std::cout << boost::format("[usrp_radar] Single frequency mode: TX=%.3f MHz; RX=%.3f MHz; actual TX LO=%.3f MHz; RX LO=%.3f MHz") 
+                      % (tx_freq / 1e6) % (rx_freq / 1e6) % (actual_tx / 1e6) % (actual_rx / 1e6) << std::endl;
+        }
+        auto deadline = std::chrono::steady_clock::now() + std::chrono::duration<double>(lo_stabilize_time);
+        while (std::chrono::steady_clock::now() < deadline) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        resume_time = usrp->get_time_now().get_real_secs() + 0.05;
+        tx_inflight = true;
+        paused = false;
+        tx_burst_seq.fetch_add(1);
+        if (verbose) {
+            std::cout << boost::format("[usrp_radar] resume_time=%.6f seq=%lu") % resume_time % tx_burst_seq.load() << std::endl;
+        }
+        // In single frequency mode, continuously transmit without frequency hopping
+        // Add stabilization delay between bursts to limit transmission rate
         while (!finished) {
+            {
+                std::unique_lock<std::mutex> lk(d_mutex);
+                d_tx_done.wait_for(lk, std::chrono::milliseconds(500), [this]{ return !tx_inflight.load(); });
+            }
+            if (!finished) {
+                // Wait for stabilization time before next burst (similar to hopping mode)
+                paused = true;
+                auto deadline = std::chrono::steady_clock::now() + std::chrono::duration<double>(lo_stabilize_time);
+                while (std::chrono::steady_clock::now() < deadline) {
+                    if (finished) break;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                }
+                if (!finished) {
+                    resume_time = usrp->get_time_now().get_real_secs() + 0.05;
+                    tx_inflight = true;
+                    paused = false;
+                    tx_burst_seq.fetch_add(1);
+                    if (verbose) {
+                        std::cout << boost::format("[usrp_radar] Single freq mode: resume_time=%.6f seq=%lu") % resume_time % tx_burst_seq.load() << std::endl;
+                    }
+                }
+            }
+        }
+    } else {
+        // Frequency hopping mode (original behavior)
+        std::vector<double> freqs;
+        if (hop_step > 0) {
+            for (double f = hop_start_freq; f <= hop_end_freq + 1e-9; f += hop_step) freqs.push_back(f);
+        } else if (hop_step < 0) {
+            for (double f = hop_start_freq; f >= hop_end_freq - 1e-9; f += hop_step) freqs.push_back(f);
+        } else {
+            freqs.push_back(tx_freq);
+        }
+
+        if (freqs.size() > 1) {
+            // Cycle through frequencies repeatedly until finished is set
+            while (!finished) {
+                for (double f : freqs) {
+                    if (finished) break;
+                    double now_dev = usrp->get_time_now().get_real_secs();
+                    double t_cmd = now_dev + 0.02;
+                    usrp->set_command_time(uhd::time_spec_t(t_cmd));
+                    tx_freq = f;
+                    rx_freq = f;
+                    usrp->set_tx_freq(tx_freq);
+                    usrp->set_rx_freq(rx_freq);
+                    usrp->clear_command_time();
+                    if (verbose) {
+                        double actual_tx = usrp->get_tx_freq();
+                        double actual_rx = usrp->get_rx_freq();
+                        std::cout << boost::format("[usrp_radar] Frequency hop: requested=%.3f MHz; actual TX LO=%.3f MHz; RX LO=%.3f MHz") % (f / 1e6) % (actual_tx / 1e6) % (actual_rx / 1e6) << std::endl;
+                    }
+                    auto deadline = std::chrono::steady_clock::now() + std::chrono::duration<double>(lo_stabilize_time);
+                    while (std::chrono::steady_clock::now() < deadline) {
+                        bool tx_ok = false, rx_ok = false;
+                        // try { tx_ok = usrp->get_tx_sensor("lo_locked").to_bool(); } catch (...) {}
+                        // try { rx_ok = usrp->get_rx_sensor("lo_locked").to_bool(); } catch (...) {}
+                        // if (tx_ok && rx_ok) break;
+                        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                    }
+                    resume_time = usrp->get_time_now().get_real_secs() + 0.05;
+                    tx_inflight = true;
+                    paused = false;
+                    tx_burst_seq.fetch_add(1);
+                    if (verbose) {
+                        std::cout << boost::format("[usrp_radar] resume_time=%.6f seq=%lu") % resume_time % tx_burst_seq.load() << std::endl;
+                    }
+                    {
+                        std::unique_lock<std::mutex> lk(d_mutex);
+                        d_tx_done.wait_for(lk, std::chrono::milliseconds(500), [this]{ return !tx_inflight.load(); });
+                    }
+                    paused = true;
+                }
+            }
+        } else {
+            // Single-pass (no hopping) behavior
             for (double f : freqs) {
                 if (finished) break;
                 double now_dev = usrp->get_time_now().get_real_secs();
@@ -234,50 +340,12 @@ void usrp_radar_impl::run()
                 tx_inflight = true;
                 paused = false;
                 tx_burst_seq.fetch_add(1);
-                if (verbose) {
-                    std::cout << boost::format("[usrp_radar] resume_time=%.6f seq=%lu") % resume_time % tx_burst_seq.load() << std::endl;
-                }
                 {
                     std::unique_lock<std::mutex> lk(d_mutex);
                     d_tx_done.wait_for(lk, std::chrono::milliseconds(500), [this]{ return !tx_inflight.load(); });
                 }
                 paused = true;
             }
-        }
-    } else {
-        // Single-pass (no hopping) behavior
-        for (double f : freqs) {
-            if (finished) break;
-            double now_dev = usrp->get_time_now().get_real_secs();
-            double t_cmd = now_dev + 0.02;
-            usrp->set_command_time(uhd::time_spec_t(t_cmd));
-            tx_freq = f;
-            rx_freq = f;
-            usrp->set_tx_freq(tx_freq);
-            usrp->set_rx_freq(rx_freq);
-            usrp->clear_command_time();
-            if (verbose) {
-                double actual_tx = usrp->get_tx_freq();
-                double actual_rx = usrp->get_rx_freq();
-                std::cout << boost::format("[usrp_radar] Frequency hop: requested=%.3f MHz; actual TX LO=%.3f MHz; RX LO=%.3f MHz") % (f / 1e6) % (actual_tx / 1e6) % (actual_rx / 1e6) << std::endl;
-            }
-            auto deadline = std::chrono::steady_clock::now() + std::chrono::duration<double>(lo_stabilize_time);
-            while (std::chrono::steady_clock::now() < deadline) {
-                bool tx_ok = false, rx_ok = false;
-                // try { tx_ok = usrp->get_tx_sensor("lo_locked").to_bool(); } catch (...) {}
-                // try { rx_ok = usrp->get_rx_sensor("lo_locked").to_bool(); } catch (...) {}
-                // if (tx_ok && rx_ok) break;
-                std::this_thread::sleep_for(std::chrono::milliseconds(5));
-            }
-            resume_time = usrp->get_time_now().get_real_secs() + 0.05;
-            tx_inflight = true;
-            paused = false;
-            tx_burst_seq.fetch_add(1);
-            {
-                std::unique_lock<std::mutex> lk(d_mutex);
-                d_tx_done.wait_for(lk, std::chrono::milliseconds(500), [this]{ return !tx_inflight.load(); });
-            }
-            paused = true;
         }
     }
 
@@ -296,9 +364,92 @@ void usrp_radar_impl::config_usrp(uhd::usrp::multi_usrp::sptr& usrp,
                                   const double rx_gain,
                                   const std::string& tx_subdev,
                                   const std::string& rx_subdev,
-                                  bool verbose)
+                                  bool verbose,
+                                  const std::string& clock_source,
+                                  const std::string& time_source)
 {
     usrp = uhd::usrp::multi_usrp::make(args);
+    
+    // 设置参考时钟源和时间源（使用主板索引 0）
+    try {
+        if (not clock_source.empty() && clock_source != "default") {
+            usrp->set_clock_source(clock_source, 0);
+            if (verbose) {
+                std::cout << boost::format("[usrp_radar] Clock source set to: %s") % clock_source << std::endl;
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cerr << boost::format("[usrp_radar] Warning: Failed to set clock source '%s': %s") 
+                     % clock_source % e.what() << std::endl;
+    }
+    
+    try {
+        if (not time_source.empty() && time_source != "default") {
+            usrp->set_time_source(time_source, 0);
+            if (verbose) {
+                std::cout << boost::format("[usrp_radar] Time source set to: %s") % time_source << std::endl;
+            }
+            
+            // If using GPSDO, wait for GPS lock and ensure time synchronization
+            if (time_source == "gpsdo") {
+                if (verbose) {
+                    std::cout << "[usrp_radar] Waiting for GPSDO lock..." << std::endl;
+                }
+                
+                // Wait for GPS lock (check GPS sensor)
+                bool gps_locked = false;
+                int lock_attempts = 0;
+                const int max_lock_attempts = 100; // 10 seconds max wait
+                while (!gps_locked && lock_attempts < max_lock_attempts) {
+                    try {
+                        uhd::sensor_value_t gps_locked_val = usrp->get_mboard_sensor("gps_locked", 0);
+                        gps_locked = gps_locked_val.to_bool();
+                        if (!gps_locked) {
+                            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                            lock_attempts++;
+                        }
+                    } catch (const std::exception& e) {
+                        // Sensor might not be available, try alternative check
+                        try {
+                            uhd::sensor_value_t gps_time_val = usrp->get_mboard_sensor("gps_time", 0);
+                            gps_locked = true; // If we can read GPS time, assume locked
+                        } catch (...) {
+                            // If sensors are not available, wait a bit and assume GPSDO is ready
+                            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                            gps_locked = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (gps_locked) {
+                    // GPSDO automatically syncs time via PPS, but we need to wait for next PPS edge
+                    // Wait for next PPS to ensure time is synchronized (wait slightly more than 1 second)
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1100));
+                    
+                    // Get current GPSDO time
+                    double gps_time = usrp->get_time_now().get_real_secs();
+                    
+                    if (verbose) {
+                        try {
+                            uhd::sensor_value_t gps_time_val = usrp->get_mboard_sensor("gps_time", 0);
+                            std::cout << boost::format("[usrp_radar] GPSDO locked. GPS time: %d, USRP time: %.6f") 
+                                         % gps_time_val.to_int() % gps_time << std::endl;
+                        } catch (...) {
+                            std::cout << boost::format("[usrp_radar] GPSDO locked. USRP time: %.6f") 
+                                         % gps_time << std::endl;
+                        }
+                    }
+                } else {
+                    std::cerr << "[usrp_radar] Warning: GPSDO lock not achieved after timeout. Continuing anyway..." << std::endl;
+                }
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cerr << boost::format("[usrp_radar] Warning: Failed to set time source '%s': %s") 
+                     % time_source % e.what() << std::endl;
+    }
+    
     if (not tx_subdev.empty()) {
         usrp->set_tx_subdev_spec(tx_subdev);
     }
@@ -315,6 +466,12 @@ void usrp_radar_impl::config_usrp(uhd::usrp::multi_usrp::sptr& usrp,
     if (verbose) {
         std::cout << boost::format("Using Device: %s") % usrp->get_pp_string()
                   << std::endl;
+        try {
+            std::cout << boost::format("Clock Source: %s") % usrp->get_clock_source(0) << std::endl;
+        } catch (...) {}
+        try {
+            std::cout << boost::format("Time Source: %s") % usrp->get_time_source(0) << std::endl;
+        } catch (...) {}
         std::cout << boost::format("Actual TX Rate: %f Msps") %
                          (usrp->get_tx_rate() / 1e6)
                   << std::endl;

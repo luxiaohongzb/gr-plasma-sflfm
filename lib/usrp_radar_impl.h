@@ -20,6 +20,9 @@
 #include <condition_variable>
 #include <fstream>
 #include <queue>
+#include <thread>
+#include <chrono>
+#include <atomic>
 
 
 namespace gr {
@@ -44,6 +47,9 @@ private:
     bool verbose;
     size_t n_delay;
     double hop_start_freq, hop_end_freq, hop_step, lo_stabilize_time;
+    std::string clock_source;
+    std::string time_source;
+    std::string freq_mode;  // "hop" for frequency hopping, "single" for single frequency
     std::atomic<bool> paused;
     std::atomic<double> resume_time;
     std::atomic<uint64_t> tx_burst_seq;
@@ -85,7 +91,9 @@ private:
                      const double rx_gain,
                      const std::string& tx_subdev,
                      const std::string& rx_subdev,
-                     bool verbose);
+                     bool verbose,
+                     const std::string& clock_source = "internal",
+                     const std::string& time_source = "internal");
     void receive(uhd::usrp::multi_usrp::sptr usrp,
                  uhd::rx_streamer::sptr rx_stream,
                  std::atomic<bool>& finished,
@@ -118,7 +126,10 @@ public:
                     const double hop_start_freq,
                     const double hop_end_freq,
                     const double hop_step,
-                    const double lo_stabilize_time);
+                    const double lo_stabilize_time,
+                    const std::string& clock_source = "internal",
+                    const std::string& time_source = "internal",
+                    const std::string& freq_mode = "hop");
     ~usrp_radar_impl();
 
     /**

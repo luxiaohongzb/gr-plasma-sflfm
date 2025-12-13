@@ -8,6 +8,7 @@
 
 #include <gnuradio/block.h>
 #include <gnuradio/plasma/api.h>
+#include <gnuradio/plasma/device.h>
 #ifdef ENABLE_PYTHON
 #pragma push_macro("slots")
 #undef slots
@@ -71,6 +72,7 @@ public:
 
     virtual void set_dynamic_range(const double) = 0;
     virtual void set_msg_queue_depth(size_t depth) = 0;
+    virtual void set_backend(Device::Backend) = 0;
 };
 
 } // namespace plasma

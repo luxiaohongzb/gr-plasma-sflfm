@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(usrp_radar.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(c508706fb7c2287f1e66ecbd3df670c6)                     */
+/* BINDTOOL_HEADER_FILE_HASH(bc243cfc38b887df2f0eb2bbad8826ac)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -52,6 +52,9 @@ void bind_usrp_radar(py::module& m)
            py::arg("hop_end_freq"),
            py::arg("hop_step"),
            py::arg("lo_stabilize_time"),
+           py::arg("clock_source") = "internal",
+           py::arg("time_source") = "internal",
+           py::arg("freq_mode") = "hop",
            D(usrp_radar,make)
         )
         

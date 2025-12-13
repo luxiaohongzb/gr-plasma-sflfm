@@ -35,6 +35,8 @@ list(APPEND plasma_sources
     ifft_range_profile_impl.h
     ifft_range_profile_window.cc
     ifft_range_profile_window.h
+    range_plot_widget.cc
+    range_plot_widget.h
 
     )
 

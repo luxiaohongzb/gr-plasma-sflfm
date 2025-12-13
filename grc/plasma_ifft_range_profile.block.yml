@@ -57,6 +57,13 @@ parameters:
     dtype: int
     default: 100
     hide: part
+  - id: backend
+    label: Backend
+    dtype: enum
+    options: [plasma.Device.DEFAULT, plasma.Device.CPU, plasma.Device.CUDA, plasma.Device.OPENCL]
+    option_labels: [Default, CPU, Cuda, OpenCL]
+    default: plasma.Device.DEFAULT
+    hide: part
   - id: gui_hint
     label: GUI Hint
     dtype: gui_hint
@@ -78,6 +85,7 @@ templates:
     plasma.ifft_range_profile(${bandwidth}, ${pulse_width}, ${sample_rate}, ${prf}, ${sweep_start}, ${sweep_stop}, ${sweep_step}, ${freq_key}, ${n_fft_synthesis})
     self.${id}.set_dynamic_range(${dynamic_range})
     self.${id}.set_msg_queue_depth(${depth})
+    self.${id}.set_backend(${backend})
     ${win} = sip.wrapinstance(self.${id}.pyqwidget(), Qt.QWidget)
     ${gui_hint() % win}
 

@@ -53,3 +53,33 @@ const std::vector<double>& RangeProfileUpdateEvent::getProfile() const
 }
 
 size_t RangeProfileUpdateEvent::getNumSamples() const { return d_num_samples; }
+
+// PulseCompressionUpdateEvent implementation
+PulseCompressionUpdateEvent::PulseCompressionUpdateEvent()
+    : QEvent(QEvent::Type(PulseCompressionUpdateEventType)), d_frequency(0.0)
+{
+}
+
+PulseCompressionUpdateEvent::~PulseCompressionUpdateEvent() {}
+
+void PulseCompressionUpdateEvent::setPulseCompressionData(
+    const std::vector<double>& range_axis,
+    const std::vector<double>& profile,
+    double frequency)
+{
+    d_range_axis = range_axis;
+    d_profile = profile;
+    d_frequency = frequency;
+}
+
+const std::vector<double>& PulseCompressionUpdateEvent::getRangeAxis() const
+{
+    return d_range_axis;
+}
+
+const std::vector<double>& PulseCompressionUpdateEvent::getProfile() const
+{
+    return d_profile;
+}
+
+double PulseCompressionUpdateEvent::getFrequency() const { return d_frequency; }

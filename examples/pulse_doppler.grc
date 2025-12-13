@@ -42,7 +42,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [344, 360.0]
+    coordinate: [256, 328.0]
     rotation: 0
     state: true
 - name: end_freq
@@ -121,7 +121,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [520, 296.0]
+    coordinate: [488, 368.0]
     rotation: 0
     state: enabled
 - name: plasma_freq_step_controller_0
@@ -149,6 +149,7 @@ blocks:
   parameters:
     affinity: ''
     alias: ''
+    backend: plasma.Device.CUDA
     bandwidth: 30e6
     comment: ''
     depth: '100'
@@ -166,7 +167,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1072, 400.0]
+    coordinate: [1392, 480.0]
     rotation: 0
     state: enabled
 - name: plasma_lfm_source_0
@@ -192,9 +193,26 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [352, 284.0]
+    coordinate: [272, 420.0]
     rotation: 0
     state: true
+- name: plasma_pdu_file_sink_0
+  id: plasma_pdu_file_sink
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    data_filename: /home/mingliu/echo_data.dat
+    meta_filename: /home/mingliu/Documents/gr-plasma/tools/data/test_1213/echo_data_meta
+    save_meta: 'True'
+    type: complex
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1080, 648.0]
+    rotation: 0
+    state: disabled
 - name: plasma_pulse_doppler_0
   id: plasma_pulse_doppler
   parameters:
@@ -269,7 +287,7 @@ blocks:
     minoutbuf: '0'
     output_dir: /home/mingliu/Documents/gr-plasma/tools/data/test5
     output_prefix: '"sweep"'
-    save_cycles: '3'
+    save_cycles: '32'
     sweep_start: start_freq
     sweep_step: step
     sweep_stop: end_freq
@@ -277,7 +295,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [752, 400.0]
+    coordinate: [1064, 456.0]
     rotation: 0
     state: enabled
 - name: plasma_usrp_radar_0
@@ -287,21 +305,24 @@ blocks:
     alias: ''
     args: addr=192.168.40.2
     cal_file: ''
+    clock_source: gpsdo
     comment: ''
     elevate_priority: 'True'
+    freq_mode: hop
     hop_end_freq: end_freq
     hop_start_freq: start_freq
     hop_step: step
     lo_stabilize_time: '1'
     maxoutbuf: '0'
     minoutbuf: '0'
-    rx_freq: 2.4e9
+    rx_freq: 3e9
     rx_freq_key: core:rx_freq
     rx_gain: '10'
     samp_rate: samp_rate
     sample_start_key: core:sample_start
     start_delay: '0.5'
-    tx_freq: 2.4e9
+    time_source: gpsdo
+    tx_freq: 3e9
     tx_freq_key: core:tx_freq
     tx_gain: '10'
     verbose: 'True'
@@ -309,7 +330,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [512, 308.0]
+    coordinate: [728, 404.0]
     rotation: 0
     state: enabled
 
@@ -317,6 +338,7 @@ connections:
 - [plasma_cw_to_pulsed_0, out, plasma_usrp_radar_0, in]
 - [plasma_lfm_source_0, out, plasma_cw_to_pulsed_0, in]
 - [plasma_sweep_collector_0, out, plasma_ifft_range_profile_0, in]
+- [plasma_usrp_radar_0, out, plasma_pdu_file_sink_0, in]
 - [plasma_usrp_radar_0, out, plasma_sweep_collector_0, in]
 
 metadata:

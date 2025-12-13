@@ -46,7 +46,10 @@ public:
                      const double hop_start_freq,
                      const double hop_end_freq,
                      const double hop_step,
-                     const double lo_stabilize_time);
+                     const double lo_stabilize_time,
+                     const std::string& clock_source = "internal",
+                     const std::string& time_source = "internal",
+                     const std::string& freq_mode = "hop");
     virtual void set_metadata_keys(const std::string& tx_freq_key,
                                    const std::string& rx_freq_key,
                                    const std::string& sample_start_key) = 0;
