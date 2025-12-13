@@ -33,8 +33,7 @@ PULSE_WIDTH = 10 * us     # Pulse width 10 microseconds
 SAMP_RATE = 60 * MHz      # Sample rate 60 MHz
 PRF = 1 * KHz             # Pulse repetition frequency 1 kHz
 FC = 3 * GHz              # Carrier frequency 3 GHz
-N_PULSE_CPI = 32          # Number of pulses in CPI 128
-SKIP_PULSES = 1           # Number of pulses to skip from the beginning
+N_PULSE_CPI = 32        # Number of pulses in CPI 128
 
 # Calculated parameters
 PRI = 1.0 / PRF           # Pulse repetition interval
@@ -147,7 +146,7 @@ def pulse_compression(rx_data, match_filt, n_fft=None):
     return pc_result
 
 
-def organize_pulses(data, n_pulse_cpi, n_samp_pri, skip_pulses=0):
+def organize_pulses(data, n_pulse_cpi, n_samp_pri):
     """
     Organize data into pulse matrix
     
@@ -159,16 +158,13 @@ def organize_pulses(data, n_pulse_cpi, n_samp_pri, skip_pulses=0):
         Number of pulses in CPI
     n_samp_pri : int
         Samples per PRI
-    skip_pulses : int
-        Number of pulses to skip from the beginning
     
     Returns:
     --------
     pulse_matrix : np.ndarray
         Pulse matrix [n_samp_pri x n_pulse_cpi]
     """
-    total_pulses = n_pulse_cpi + skip_pulses
-    expected_len = total_pulses * n_samp_pri
+    expected_len = n_pulse_cpi * n_samp_pri
     
     if len(data) < expected_len:
         print(f"Warning: Data length insufficient ({len(data)} < {expected_len}), padding zeros")
@@ -178,14 +174,7 @@ def organize_pulses(data, n_pulse_cpi, n_samp_pri, skip_pulses=0):
         data = data[:expected_len]
     
     # Reshape to [fast time x slow time] matrix
-    pulse_matrix_full = data.reshape(n_samp_pri, total_pulses, order='F')
-    
-    # Skip the first skip_pulses pulses
-    if skip_pulses > 0:
-        pulse_matrix = pulse_matrix_full[:, skip_pulses:]
-        print(f"Skipped first {skip_pulses} pulse(s), using pulses {skip_pulses} to {total_pulses-1}")
-    else:
-        pulse_matrix = pulse_matrix_full
+    pulse_matrix = data.reshape(n_samp_pri, n_pulse_cpi, order='F')
     
     return pulse_matrix
 
@@ -220,16 +209,14 @@ def doppler_fft(pulse_compressed, n_fft=None):
     return rdm
 
 
-def phase_analysis(pulse_compressed, rdm, range_bin=None):
+def phase_analysis(rdm, range_bin=None):
     """
-    Phase analysis - extract phase from echo data and calculate phase differences
+    Phase analysis
     
     Parameters:
     -----------
-    pulse_compressed : np.ndarray
-        Pulse compressed data [n_range x n_pulse]
     rdm : np.ndarray
-        Range-Doppler map (for peak detection only)
+        Range-Doppler map
     range_bin : int, optional
         Specify range bin, default selects peak location
     
@@ -238,7 +225,7 @@ def phase_analysis(pulse_compressed, rdm, range_bin=None):
     phase_data : dict
         Phase analysis results
     """
-    # Find peak location from RDM
+    # Find peak location
     if range_bin is None:
         max_idx = np.unravel_index(np.argmax(np.abs(rdm)), rdm.shape)
         range_bin = max_idx[0]
@@ -250,33 +237,22 @@ def phase_analysis(pulse_compressed, rdm, range_bin=None):
         doppler_bin = np.argmax(doppler_profile)
         print(f"Specified range bin={range_bin}, Peak Doppler bin={doppler_bin}")
     
-    # Extract phase sequence from pulse compressed data at peak range bin
-    # This gives the phase evolution across pulses
-    phase_seq = np.angle(pulse_compressed[range_bin, :])
+    # Extract phase sequence for this range bin
+    phase_seq = np.angle(rdm[range_bin, :])
     
-    # Unwrap phase to handle 2π jumps
-    phase_unwrapped = np.unwrap(phase_seq)
+    # Extract phase at peak Doppler bin
+    peak_phase = np.angle(rdm[range_bin, doppler_bin])
     
-    # Calculate phase difference between consecutive pulses
-    phase_diff = np.diff(phase_unwrapped)
-    
-    # Calculate statistics
-    avg_phase_diff = np.mean(phase_diff)
-    std_phase_diff = np.std(phase_diff)
-    
-    print(f"Phase statistics:")
-    print(f"  Average phase difference: {avg_phase_diff:.6f} rad/pulse")
-    print(f"  Std phase difference: {std_phase_diff:.6f} rad/pulse")
-    print(f"  Estimated Doppler frequency: {avg_phase_diff * PRF / (2 * np.pi):.2f} Hz")
+    # Calculate phase change rate (Doppler frequency)
+    phase_diff = np.diff(np.unwrap(phase_seq))
+    avg_phase_rate = np.mean(phase_diff) if len(phase_diff) > 0 else 0
     
     return {
         'range_bin': range_bin,
         'doppler_bin': doppler_bin,
         'phase_sequence': phase_seq,
-        'phase_unwrapped': phase_unwrapped,
-        'phase_diff': phase_diff,
-        'avg_phase_diff': avg_phase_diff,
-        'std_phase_diff': std_phase_diff,
+        'peak_phase': peak_phase,
+        'phase_rate': avg_phase_rate,
         'doppler_profile': np.abs(rdm[range_bin, :])
     }
 
@@ -360,41 +336,36 @@ def plot_results(pulse_matrix, pulse_compressed, rdm, phase_info,
     plt.plot(peak_vel, peak_range, 'r*', markersize=15, label='Peak')
     plt.legend()
     
-    # 4. Amplitude at peak range bin (Doppler spectrum)
+    # 4. Amplitude and phase at peak range bin
     ax4 = plt.subplot(2, 3, 4)
-    plt.plot(velocity_axis, phase_info['doppler_profile'], 'b-', linewidth=2)
-    plt.xlabel('Velocity (m/s)')
-    plt.ylabel('Amplitude')
+    ax4_twin = ax4.twinx()
+    line1 = ax4.plot(velocity_axis, phase_info['doppler_profile'], 'b-', label='Amplitude')
+    line2 = ax4_twin.plot(velocity_axis, phase_info['phase_sequence'], 'r-', label='Phase')
+    ax4.set_xlabel('Velocity (m/s)')
+    ax4.set_ylabel('Amplitude', color='b')
+    ax4_twin.set_ylabel('Phase (rad)', color='r')
+    ax4.tick_params(axis='y', labelcolor='b')
+    ax4_twin.tick_params(axis='y', labelcolor='r')
     plt.title(f'Doppler Spectrum at Range Bin {phase_info["range_bin"]}')
-    plt.grid(True)
+    ax4.grid(True)
     
-    # 5. Phase sequence (unwrapped) vs Pulse index
+    # 5. Phase variation (unwrapped)
     ax5 = plt.subplot(2, 3, 5)
     pulse_idx = np.arange(n_pulse_cpi)
-    phase_unwrapped = phase_info['phase_unwrapped']
-    plt.plot(pulse_idx, phase_unwrapped, 'g-o', markersize=4, linewidth=1.5, label='Phase')
+    plt.plot(pulse_idx, np.unwrap(phase_info['phase_sequence']), 'g-o', markersize=3)
     plt.xlabel('Pulse Index')
     plt.ylabel('Phase (rad, unwrapped)')
-    plt.title('Phase Sequence Across Pulses')
-    plt.legend()
+    plt.title('Phase Variation Sequence')
     plt.grid(True)
     
-    # 6. Phase difference vs Pulse index
+    # 6. Average range profile (coherent integration of all pulses)
     ax6 = plt.subplot(2, 3, 6)
-    pulse_diff_idx = np.arange(1, n_pulse_cpi)  # Phase diff has n_pulse-1 elements
-    phase_diff = phase_info['phase_diff']
-    plt.plot(pulse_diff_idx, phase_diff, 'r-o', markersize=4, linewidth=1.5, label='Phase Difference')
-    plt.axhline(y=phase_info['avg_phase_diff'], color='b', linestyle='--', 
-                label=f'Mean: {phase_info["avg_phase_diff"]:.4f} rad')
-    plt.xlabel('Pulse Index (difference)')
-    plt.ylabel('Phase Difference (rad)')
-    plt.title('Phase Difference Between Consecutive Pulses')
-    plt.legend()
+    avg_range_profile = np.mean(pc_db, axis=1)
+    plt.plot(pc_range_axis, avg_range_profile, 'k-', linewidth=2)
+    plt.xlabel('Range (m)')
+    plt.ylabel('Amplitude (dB)')
+    plt.title('Average Range Profile (128 Pulses Coherent Integration)')
     plt.grid(True)
-    
-    # Note: Subplot 2,3,6 is now used for phase difference
-    # If you want to keep the average range profile, we can add it as a 7th subplot
-    # or replace one of the existing plots
     
     plt.tight_layout()
     return fig
@@ -406,21 +377,12 @@ def main():
     if len(sys.argv) > 1:
         data_file = sys.argv[1]
     else:
-        data_file = '/home/mingliu/Documents/gr-plasma/tools/echo_data.dat'
+        data_file = '/home/mingliu/echo_data.dat'
     
     if len(sys.argv) > 2:
         meta_file = sys.argv[2]
     else:
         meta_file = '/home/mingliu/echo_data_meta'
-    
-    # Skip pulses parameter (can be overridden via command line)
-    global SKIP_PULSES
-    if len(sys.argv) > 3:
-        try:
-            SKIP_PULSES = int(sys.argv[3])
-            print(f"Using skip_pulses={SKIP_PULSES} from command line")
-        except ValueError:
-            print(f"Warning: Invalid skip_pulses value '{sys.argv[3]}', using default {SKIP_PULSES}")
     
     print("=" * 60)
     print("Echo Data Analysis: Pulse Compression Coherent Integration and Phase Analysis for 128 Pulses")
@@ -434,7 +396,6 @@ def main():
     print(f"  PRF: {PRF/1e3:.1f} kHz")
     print(f"  Carrier frequency: {FC/1e9:.1f} GHz")
     print(f"  Pulses in CPI: {N_PULSE_CPI}")
-    print(f"  Skip pulses: {SKIP_PULSES}")
     print("=" * 60)
     
     # 1. Read data
@@ -447,7 +408,7 @@ def main():
     
     # 3. Organize into pulse matrix
     print(f"\nOrganizing pulse data (expected: {N_PULSE_CPI} pulses, {N_SAMP_PRI} points each)...")
-    pulse_matrix = organize_pulses(data, N_PULSE_CPI, N_SAMP_PRI, skip_pulses=SKIP_PULSES)
+    pulse_matrix = organize_pulses(data, N_PULSE_CPI, N_SAMP_PRI)
     print(f"Pulse matrix shape: {pulse_matrix.shape} [fast time x slow time]")
     
     # 4. Pulse compression
@@ -468,9 +429,11 @@ def main():
     
     # 6. Phase analysis
     print("\nPerforming phase analysis...")
-    phase_info = phase_analysis(pulse_compressed, rdm)
+    phase_info = phase_analysis(rdm)
     print(f"Peak range bin: {phase_info['range_bin']}")
     print(f"Peak Doppler bin: {phase_info['doppler_bin']}")
+    print(f"Peak phase: {phase_info['peak_phase']:.4f} rad ({np.degrees(phase_info['peak_phase']):.2f} deg)")
+    print(f"Average phase rate: {phase_info['phase_rate']:.6f} rad/pulse")
     
     # 7. Plot results
     print("\nGenerating visualization...")
