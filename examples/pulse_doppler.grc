@@ -42,7 +42,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [256, 328.0]
+    coordinate: [344, 360.0]
     rotation: 0
     state: true
 - name: end_freq
@@ -121,7 +121,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [488, 368.0]
+    coordinate: [576, 248.0]
     rotation: 0
     state: enabled
 - name: plasma_freq_step_controller_0
@@ -144,32 +144,6 @@ blocks:
     coordinate: [1096, 148.0]
     rotation: 0
     state: disabled
-- name: plasma_ifft_range_profile_0
-  id: plasma_ifft_range_profile
-  parameters:
-    affinity: ''
-    alias: ''
-    backend: plasma.Device.CUDA
-    bandwidth: 30e6
-    comment: ''
-    depth: '100'
-    dynamic_range: '60'
-    freq_key: core:rx_freq
-    gui_hint: ''
-    n_fft_synthesis: '256'
-    prf: 1e3
-    pulse_width: 10e-6
-    sample_rate: samp_rate
-    sweep_start: start_freq
-    sweep_step: step
-    sweep_stop: end_freq
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [1392, 480.0]
-    rotation: 0
-    state: enabled
 - name: plasma_lfm_source_0
   id: plasma_lfm_source
   parameters:
@@ -193,26 +167,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [272, 420.0]
+    coordinate: [384, 204.0]
     rotation: 0
     state: true
-- name: plasma_pdu_file_sink_0
-  id: plasma_pdu_file_sink
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: ''
-    data_filename: /home/mingliu/echo_data.dat
-    meta_filename: /home/mingliu/Documents/gr-plasma/tools/data/test_1213/echo_data_meta
-    save_meta: 'True'
-    type: complex
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [1080, 648.0]
-    rotation: 0
-    state: disabled
 - name: plasma_pulse_doppler_0
   id: plasma_pulse_doppler
   parameters:
@@ -283,11 +240,9 @@ blocks:
     alias: ''
     comment: ''
     freq_key: core:rx_freq
-    maxoutbuf: '0'
-    minoutbuf: '0'
-    output_dir: /home/mingliu/Documents/gr-plasma/tools/data/test5
+    output_dir: /home/mingliu/Documents/gr-plasma/tools/data/echo_data
     output_prefix: '"sweep"'
-    save_cycles: '2'
+    save_cycles: '10'
     sweep_start: start_freq
     sweep_step: step
     sweep_stop: end_freq
@@ -295,9 +250,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1064, 456.0]
+    coordinate: [800, 256.0]
     rotation: 0
-    state: enabled
+    state: true
 - name: plasma_usrp_radar_0
   id: plasma_usrp_radar
   parameters:
@@ -305,24 +260,21 @@ blocks:
     alias: ''
     args: addr=192.168.40.2
     cal_file: ''
-    clock_source: gpsdo
     comment: ''
     elevate_priority: 'True'
-    freq_mode: hop
     hop_end_freq: end_freq
     hop_start_freq: start_freq
     hop_step: step
     lo_stabilize_time: '1'
     maxoutbuf: '0'
     minoutbuf: '0'
-    rx_freq: 3e9
+    rx_freq: 2.4e9
     rx_freq_key: core:rx_freq
     rx_gain: '10'
     samp_rate: samp_rate
     sample_start_key: core:sample_start
     start_delay: '0.5'
-    time_source: gpsdo
-    tx_freq: 3e9
+    tx_freq: 2.4e9
     tx_freq_key: core:tx_freq
     tx_gain: '10'
     verbose: 'True'
@@ -330,15 +282,13 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [728, 404.0]
+    coordinate: [800, 244.0]
     rotation: 0
     state: enabled
 
 connections:
 - [plasma_cw_to_pulsed_0, out, plasma_usrp_radar_0, in]
 - [plasma_lfm_source_0, out, plasma_cw_to_pulsed_0, in]
-- [plasma_sweep_collector_0, out, plasma_ifft_range_profile_0, in]
-- [plasma_usrp_radar_0, out, plasma_pdu_file_sink_0, in]
 - [plasma_usrp_radar_0, out, plasma_sweep_collector_0, in]
 
 metadata:

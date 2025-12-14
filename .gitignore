@@ -39,3 +39,4 @@ tools/data
 tools/analysis_out
 tools/sweep_analysis
 .vscode
+examples/*
