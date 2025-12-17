@@ -10,6 +10,8 @@
  #include <chrono>
  #include <filesystem>
  #include <iostream>
+ #include <cmath>
+ #include <algorithm>
  
  namespace gr {
  namespace plasma {
@@ -68,6 +70,7 @@
      sweep_stop = stop;
      sweep_step = step;
      compute_expected_freqs();
+  
      collected.clear();
  }
  
@@ -83,34 +86,67 @@
      output_prefix = prefix;
  }
  
- void sweep_collector_impl::compute_expected_freqs()
- {
-     expected_freqs.clear();
-     if (sweep_step == 0.0) {
-         return;
-     }
-     if (sweep_step > 0) {
-         for (double f = sweep_start; f <= sweep_stop + 1e-9; f += sweep_step) {
-             expected_freqs.push_back(f);
-         }
-     } else {
-         for (double f = sweep_start; f >= sweep_stop - 1e-9; f += sweep_step) {
-             expected_freqs.push_back(f);
-         }
-     }
- }
+void sweep_collector_impl::compute_expected_freqs()
+{
+    expected_freqs.clear();
+    if (sweep_step == 0.0) {
+        return;
+    }
+    if (sweep_step > 0) {
+        for (double f = sweep_start; f <= sweep_stop + 1e-9; f += sweep_step) {
+            // Normalize frequency to avoid floating point precision issues
+            double normalized_freq = std::round(f / 1e6) * 1e6;  // Round to nearest MHz
+            expected_freqs.push_back(normalized_freq);
+        }
+    } else {
+        for (double f = sweep_start; f >= sweep_stop - 1e-9; f += sweep_step) {
+            // Normalize frequency to avoid floating point precision issues
+            double normalized_freq = std::round(f / 1e6) * 1e6;  // Round to nearest MHz
+            expected_freqs.push_back(normalized_freq);
+        }
+    }
+    // for (double f : expected_freqs) {
+    //    std::cout << "[sweep_collector] Expected frequency: " << f << " Hz" << std::endl;
+    // }
+}
  
- bool sweep_collector_impl::check_sweep_complete()
- {
-     if (expected_freqs.empty())
-         return false;
-     for (double f : expected_freqs) {
-         auto it = collected.find(f);
-         if (it == collected.end() || it->second.empty())
-             return false;
-     }
-     return true;
- }
+bool sweep_collector_impl::check_sweep_complete()
+{
+    if (expected_freqs.empty())
+        return false;
+    
+    std::cout << "[sweep_collector] Checking sweep completeness: " << expected_freqs.size() << " expected, " << collected.size() << " collected" << std::endl;
+    
+    for (double f : expected_freqs) {
+        auto it = collected.find(f);
+        if (it == collected.end()) {
+            std::cout << "[sweep_collector] Missing frequency: " << f << " Hz" << std::endl;
+            // Try to find with tolerance (1 Hz)
+            bool found = false;
+            for (const auto& kv : collected) {
+                if (std::abs(kv.first - f) < 1.0) {
+               //     std::cout << "[sweep_collector] Found frequency " << kv.first << " Hz (close to " << f << " Hz)" << std::endl;
+                    found = true;
+                    if (kv.second.empty()) {
+                        std::cout << "[sweep_collector] Frequency " << kv.first << " has empty data" << std::endl;
+                        return false;
+                    }
+                    break;
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        } else if (it->second.empty()) {
+            std::cout << "[sweep_collector] Frequency " << f << " has empty data" << std::endl;
+            return false;
+        } else {
+            std::cout << "[sweep_collector] Found frequency " << f << " Hz with " << it->second.size() << " samples" << std::endl;
+        }
+    }
+    std::cout << "[sweep_collector] All frequencies collected!" << std::endl;
+    return true;
+}
  
  void sweep_collector_impl::write_and_reset()
  {
@@ -234,13 +270,16 @@
          std::cout << std::endl;
      }
  
-     {
-         std::lock_guard<std::mutex> g(lock);
-         // Replace the data for this frequency with the latest PDU
-         auto &bucket = collected[freq];
-         bucket.clear();  // Clear old data
-         bucket.insert(bucket.end(), data, data + n);  // Insert new data
-     }
+    {
+        std::lock_guard<std::mutex> g(lock);
+        // Replace the data for this frequency with the latest PDU
+        // Use normalized frequency as key to avoid floating point precision issues
+        double normalized_freq = std::round(freq / 1e6) * 1e6;  // Round to nearest MHz
+        auto &bucket = collected[normalized_freq];
+        bucket.clear();  // Clear old data
+        bucket.insert(bucket.end(), data, data + n);  // Insert new data
+        std::cout << "[sweep_collector] Stored " << n << " samples for frequency " << normalized_freq << " Hz (original: " << freq << " Hz)" << std::endl;
+    }
 
      // Forward the message to output port for ifft_range_profile
      message_port_pub(pmt::intern("out"), msg);

@@ -37,7 +37,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '20000000.0'
+    value: '50000000.0'
   states:
     bus_sink: false
     bus_source: false
@@ -49,7 +49,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '3400000000.0'
+    value: '5400000000.0'
   states:
     bus_sink: false
     bus_source: false
@@ -73,7 +73,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '40000000.0'
+    value: '100000000.0'
   states:
     bus_sink: false
     bus_source: false
@@ -85,7 +85,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '3000000000.0'
+    value: '5000000000.0'
   states:
     bus_sink: false
     bus_source: false
@@ -97,7 +97,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '20000000.0'
+    value: bandwidth
   states:
     bus_sink: false
     bus_source: false
@@ -121,29 +121,35 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [576, 248.0]
+    coordinate: [568, 224.0]
     rotation: 0
     state: enabled
-- name: plasma_freq_step_controller_0
-  id: plasma_freq_step_controller
+- name: plasma_ifft_range_profile_0
+  id: plasma_ifft_range_profile
   parameters:
     affinity: ''
     alias: ''
+    backend: plasma.Device.CUDA
+    bandwidth: bandwidth
     comment: ''
-    cyclic: 'True'
-    maxoutbuf: '0'
-    minoutbuf: '0'
-    start_freq: start_freq
-    step_freq: step
-    stop_freq: end_freq
-    tx_freq_key: core:tx_freq
+    depth: '100'
+    dynamic_range: '60'
+    freq_key: core:rx_freq
+    gui_hint: ''
+    n_fft_synthesis: '256'
+    prf: 1e3
+    pulse_width: 10e-6
+    sample_rate: samp_rate
+    sweep_start: start_freq
+    sweep_step: step
+    sweep_stop: end_freq
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1096, 148.0]
+    coordinate: [1152, 160.0]
     rotation: 0
-    state: disabled
+    state: true
 - name: plasma_lfm_source_0
   id: plasma_lfm_source
   parameters:
@@ -167,7 +173,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [384, 204.0]
+    coordinate: [480, 116.0]
     rotation: 0
     state: true
 - name: plasma_pulse_doppler_0
@@ -240,9 +246,11 @@ blocks:
     alias: ''
     comment: ''
     freq_key: core:rx_freq
+    maxoutbuf: '0'
+    minoutbuf: '0'
     output_dir: /home/mingliu/Documents/gr-plasma/tools/data/echo_data
     output_prefix: '"sweep"'
-    save_cycles: '10'
+    save_cycles: '4'
     sweep_start: start_freq
     sweep_step: step
     sweep_stop: end_freq
@@ -250,7 +258,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [800, 256.0]
+    coordinate: [904, 120.0]
     rotation: 0
     state: true
 - name: plasma_usrp_radar_0
@@ -258,37 +266,39 @@ blocks:
   parameters:
     affinity: ''
     alias: ''
-    args: addr=192.168.40.2
+    args: addr = 192.168.40.2
     cal_file: ''
     comment: ''
     elevate_priority: 'True'
     hop_end_freq: end_freq
     hop_start_freq: start_freq
     hop_step: step
-    lo_stabilize_time: '1'
+    lo_stabilize_time: '0.2'
     maxoutbuf: '0'
     minoutbuf: '0'
-    rx_freq: 2.4e9
+    rx_freq: 3.0e9
     rx_freq_key: core:rx_freq
-    rx_gain: '10'
+    rx_gain: '15'
     samp_rate: samp_rate
     sample_start_key: core:sample_start
     start_delay: '0.5'
-    tx_freq: 2.4e9
+    step_delay: '1'
+    tx_freq: 3.0e9
     tx_freq_key: core:tx_freq
-    tx_gain: '10'
+    tx_gain: '15'
     verbose: 'True'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [800, 244.0]
+    coordinate: [704, 60.0]
     rotation: 0
     state: enabled
 
 connections:
 - [plasma_cw_to_pulsed_0, out, plasma_usrp_radar_0, in]
 - [plasma_lfm_source_0, out, plasma_cw_to_pulsed_0, in]
+- [plasma_sweep_collector_0, out, plasma_ifft_range_profile_0, in]
 - [plasma_usrp_radar_0, out, plasma_sweep_collector_0, in]
 
 metadata:

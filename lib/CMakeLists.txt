@@ -37,8 +37,7 @@ list(APPEND plasma_sources
     ifft_range_profile_window.h
     range_plot_widget.cc
     range_plot_widget.h
-
-    )
+    rfnoc_radar_impl.cc )
 
 set(plasma_sources "${plasma_sources}" PARENT_SCOPE)
 if(NOT plasma_sources)
