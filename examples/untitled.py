@@ -72,19 +72,19 @@ class untitled(gr.top_block, Qt.QWidget):
         ##################################################
         # Variables
         ##################################################
-        self.bandwidth = bandwidth = 50000000.0
+        self.bandwidth = bandwidth = 20000000.0
         self.step = step = bandwidth
-        self.start_freq = start_freq = 3400000000.0
-        self.samp_rate = samp_rate = 100000000.0
+        self.start_freq = start_freq = 1500000000.0
+        self.samp_rate = samp_rate = 40000000.0
         self.n_pulse_cpi = n_pulse_cpi = 128
-        self.end_freq = end_freq = 4000000000.0
+        self.end_freq = end_freq = 2000000000.0
 
         ##################################################
         # Blocks
         ##################################################
-        self.plasma_usrp_radar_0 = plasma.usrp_radar('addr = 192.168.40.2', samp_rate, samp_rate, 3.0e9, 3.0e9, 15, 15, 0.5, True, '', True, start_freq, end_freq, step, 0.2, 1)
+        self.plasma_usrp_radar_0 = plasma.usrp_radar('serial_no = 8001093', samp_rate, samp_rate, 3.0e9, 3.0e9, 40, 40, 0.5, True, '', True, start_freq, end_freq, step, 0.5, 1)
         self.plasma_usrp_radar_0.set_metadata_keys('core:tx_freq', 'core:rx_freq', 'core:sample_start')
-        self.plasma_sweep_collector_0 = plasma.sweep_collector("sweep", '/home/mingliu/Documents/gr-plasma/tools/data/echo_data', 4, start_freq, end_freq, step, 'core:rx_freq')
+        self.plasma_sweep_collector_0 = plasma.sweep_collector("sweep", '/home/mingliu/Documents/echo_data', 4, start_freq, end_freq, step, 'core:rx_freq')
         self.plasma_lfm_source_0 = plasma.lfm_source(bandwidth, -bandwidth/2, 10e-6, samp_rate, 0)
         self.plasma_lfm_source_0.init_meta_dict('radar:bandwidth', 'radar:start_freq', 'radar:duration', 'core:sample_rate', 'core:label', 'radar:prf')
         self.plasma_ifft_range_profile_0 = plasma.ifft_range_profile(bandwidth, 10e-6, samp_rate, 1e3, start_freq, end_freq, step, 'core:rx_freq', 256)

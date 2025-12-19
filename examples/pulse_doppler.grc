@@ -37,7 +37,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '50000000.0'
+    value: '20000000.0'
   states:
     bus_sink: false
     bus_source: false
@@ -49,7 +49,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '4000000000.0'
+    value: '2000000000.0'
   states:
     bus_sink: false
     bus_source: false
@@ -73,7 +73,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '100000000.0'
+    value: '40000000.0'
   states:
     bus_sink: false
     bus_source: false
@@ -85,12 +85,12 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '3400000000.0'
+    value: '1500000000.0'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [368, 168.0]
+    coordinate: [376, 152.0]
     rotation: 0
     state: enabled
 - name: step
@@ -121,7 +121,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [504, 232.0]
+    coordinate: [440, 232.0]
     rotation: 0
     state: enabled
 - name: plasma_ifft_range_profile_0
@@ -173,7 +173,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [224, 132.0]
+    coordinate: [192, 124.0]
     rotation: 0
     state: true
 - name: plasma_pulse_doppler_0
@@ -248,7 +248,7 @@ blocks:
     freq_key: core:rx_freq
     maxoutbuf: '0'
     minoutbuf: '0'
-    output_dir: /home/mingliu/Documents/gr-plasma/tools/data/echo_data
+    output_dir: /home/mingliu/Documents/echo_data
     output_prefix: '"sweep"'
     save_cycles: '4'
     sweep_start: start_freq
@@ -266,26 +266,26 @@ blocks:
   parameters:
     affinity: ''
     alias: ''
-    args: addr = 192.168.40.2
+    args: serial_no = 8001093
     cal_file: ''
     comment: ''
     elevate_priority: 'True'
     hop_end_freq: end_freq
     hop_start_freq: start_freq
     hop_step: step
-    lo_stabilize_time: '0.2'
+    lo_stabilize_time: '0.5'
     maxoutbuf: '0'
     minoutbuf: '0'
     rx_freq: 3.0e9
     rx_freq_key: core:rx_freq
-    rx_gain: '15'
+    rx_gain: '40'
     samp_rate: samp_rate
     sample_start_key: core:sample_start
     start_delay: '0.5'
     step_delay: '1'
     tx_freq: 3.0e9
     tx_freq_key: core:tx_freq
-    tx_gain: '15'
+    tx_gain: '40'
     verbose: 'True'
   states:
     bus_sink: false
