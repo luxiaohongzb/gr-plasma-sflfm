@@ -49,7 +49,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '5400000000.0'
+    value: '4000000000.0'
   states:
     bus_sink: false
     bus_source: false
@@ -85,7 +85,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '5000000000.0'
+    value: '3400000000.0'
   states:
     bus_sink: false
     bus_source: false
@@ -121,7 +121,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [568, 224.0]
+    coordinate: [504, 232.0]
     rotation: 0
     state: enabled
 - name: plasma_ifft_range_profile_0
@@ -147,7 +147,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1152, 160.0]
+    coordinate: [1136, 136.0]
     rotation: 0
     state: true
 - name: plasma_lfm_source_0
@@ -173,7 +173,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [480, 116.0]
+    coordinate: [224, 132.0]
     rotation: 0
     state: true
 - name: plasma_pulse_doppler_0
@@ -258,7 +258,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [904, 120.0]
+    coordinate: [760, 168.0]
     rotation: 0
     state: true
 - name: plasma_usrp_radar_0
@@ -291,7 +291,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [704, 60.0]
+    coordinate: [568, 84.0]
     rotation: 0
     state: enabled
 

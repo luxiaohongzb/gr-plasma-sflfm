@@ -74,10 +74,10 @@ class untitled(gr.top_block, Qt.QWidget):
         ##################################################
         self.bandwidth = bandwidth = 50000000.0
         self.step = step = bandwidth
-        self.start_freq = start_freq = 5000000000.0
+        self.start_freq = start_freq = 3400000000.0
         self.samp_rate = samp_rate = 100000000.0
         self.n_pulse_cpi = n_pulse_cpi = 128
-        self.end_freq = end_freq = 5400000000.0
+        self.end_freq = end_freq = 4000000000.0
 
         ##################################################
         # Blocks
