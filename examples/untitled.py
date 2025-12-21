@@ -82,7 +82,7 @@ class untitled(gr.top_block, Qt.QWidget):
         ##################################################
         # Blocks
         ##################################################
-        self.plasma_usrp_radar_0 = plasma.usrp_radar('serial_no = 8001093', samp_rate, samp_rate, 3.0e9, 3.0e9, 40, 40, 0.5, True, '', True, start_freq, end_freq, step, 0.5, 1)
+        self.plasma_usrp_radar_0 = plasma.usrp_radar('serial_no = 8001093', samp_rate, samp_rate, 3.0e9, 3.0e9, 50, 55, 0.5, True, '', False, start_freq, end_freq, step, 0.5, 0.5)
         self.plasma_usrp_radar_0.set_metadata_keys('core:tx_freq', 'core:rx_freq', 'core:sample_start')
         self.plasma_sweep_collector_0 = plasma.sweep_collector("sweep", '/home/mingliu/Documents/echo_data', 4, start_freq, end_freq, step, 'core:rx_freq')
         self.plasma_lfm_source_0 = plasma.lfm_source(bandwidth, -bandwidth/2, 10e-6, samp_rate, 0)

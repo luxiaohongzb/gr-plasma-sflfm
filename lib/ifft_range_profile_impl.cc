@@ -311,13 +311,14 @@ void ifft_range_profile_impl::handle_rx_msg(pmt::pmt_t msg)
             if (d_main_gui && !d_main_gui->is_closed() && !pc_result.empty()) {
                 PulseCompressionUpdateEvent* pc_event = new PulseCompressionUpdateEvent();
                 
-                // 计算距离轴
-                double coarse_res = SPEED_OF_LIGHT / (2.0 * d_bandwidth);
+                // 计算距离轴：基于采样率的距离步长（过采样）
+                // 每个采样点对应的距离间隔 = c * Ts / 2
+                double range_step = SPEED_OF_LIGHT / (2.0 * d_sample_rate);
                 std::vector<double> pc_range_axis(pc_result.size());
                 std::vector<double> pc_profile(pc_result.size());
                 
                 for (size_t i = 0; i < pc_result.size(); i++) {
-                    pc_range_axis[i] = i * coarse_res;
+                    pc_range_axis[i] = i * range_step;
                     pc_profile[i] = std::abs(pc_result[i]);
                 }
                 
@@ -327,11 +328,11 @@ void ifft_range_profile_impl::handle_rx_msg(pmt::pmt_t msg)
                 std::cout << "[ifft_range_profile] Sent pulse compression result for freq " 
                           << freq_copy / 1e9 << " GHz to GUI" << std::endl;
             }
-        } catch (const std::exception& e) {
-            std::cerr << "[ifft_range_profile] Error processing frequency " 
-                      << freq_copy / 1e9 << " GHz: " << e.what() << std::endl;
         } catch (const af::exception& e) {
             std::cerr << "[ifft_range_profile] ArrayFire error processing frequency " 
+                      << freq_copy / 1e9 << " GHz: " << e.what() << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "[ifft_range_profile] Error processing frequency " 
                       << freq_copy / 1e9 << " GHz: " << e.what() << std::endl;
         } catch (...) {
             std::cerr << "[ifft_range_profile] Unknown error processing frequency " 
@@ -358,10 +359,10 @@ void ifft_range_profile_impl::handle_rx_msg(pmt::pmt_t msg)
                     // 确保 ArrayFire 上下文正确初始化
                     af::sync();
                     process_sweep();
-                } catch (const std::exception& e) {
-                    std::cerr << "[ifft_range_profile] Thread error: " << e.what() << std::endl;
                 } catch (const af::exception& e) {
                     std::cerr << "[ifft_range_profile] ArrayFire thread error: " << e.what() << std::endl;
+                } catch (const std::exception& e) {
+                    std::cerr << "[ifft_range_profile] Thread error: " << e.what() << std::endl;
                 } catch (...) {
                     std::cerr << "[ifft_range_profile] Unknown thread error" << std::endl;
                 }
@@ -422,8 +423,18 @@ void ifft_range_profile_impl::perform_pulse_compression(
         return;
     }
     
-    // 截断或填充到 n_fft_fast 长度，以保持与原始 FFT 实现的一致性
+    // 截掉前面对应匹配滤波器长度的样本（去除负距离/暂态响应部分）
+    // 保留从 0 米开始的有效数据
+    int valid_start_idx = static_cast<int>(match_filt_size);
     int result_len = pc_result.elements();
+    
+    if (valid_start_idx < result_len) {
+        // 从 valid_start_idx 开始截取
+        pc_result = pc_result(af::seq(valid_start_idx, result_len - 1));
+        result_len = pc_result.elements();
+    }
+    
+    // 截断或填充到 n_fft_fast 长度，以保持与原始 FFT 实现的一致性
     if (result_len > n_fft_fast) {
         // 截断到 n_fft_fast
         pc_result = pc_result(af::seq(n_fft_fast));
@@ -447,6 +458,85 @@ void ifft_range_profile_impl::perform_pulse_compression(
         return;
     }
 }
+
+// void ifft_range_profile_impl::perform_phase_calibration(
+//     std::vector<std::vector<gr_complex>>& pc_data,
+//     int search_range_bins)
+// {
+//     if (pc_data.empty() || pc_data[0].empty()) {
+//         std::cout << "[ifft_range_profile] Cannot perform phase calibration: empty data" << std::endl;
+//         return;
+//     }
+
+//     int n_freq = pc_data.size();      // 频点数（慢时间）
+//     int n_range = pc_data[0].size();  // 距离单元数（快时间）
+    
+//     // 限制搜索范围，避免越界
+//     int search_limit = std::min(search_range_bins, n_range);
+    
+//     std::cout << "[ifft_range_profile] Phase calibration: searching leakage in first " 
+//               << search_limit << " range bins across " << n_freq << " frequencies" << std::endl;
+
+//     // 1. 逐频点寻找直耦峰值
+//     std::vector<int> leak_indices(n_freq);
+//     std::vector<gr_complex> leak_phasors(n_freq);
+    
+//     for (int freq_idx = 0; freq_idx < n_freq; freq_idx++) {
+//         // 在当前频点的前 search_limit 个距离单元中找最大值
+//         double max_magnitude = 0.0;
+//         int max_idx = 0;
+        
+//         for (int range_idx = 0; range_idx < search_limit; range_idx++) {
+//             double mag = std::abs(pc_data[freq_idx][range_idx]);
+//             if (mag > max_magnitude) {
+//                 max_magnitude = mag;
+//                 max_idx = range_idx;
+//             }
+//         }
+        
+//         leak_indices[freq_idx] = max_idx;
+//         leak_phasors[freq_idx] = pc_data[freq_idx][max_idx];
+        
+//         std::cout << "[ifft_range_profile] Freq " << freq_idx 
+//                   << ": leakage peak at bin " << max_idx 
+//                   << ", magnitude=" << max_magnitude 
+//                   << ", phase=" << std::arg(leak_phasors[freq_idx]) << " rad" << std::endl;
+//     }
+
+//     // 2. 计算校准因子：conj(leak_phasors) / abs(leak_phasors)
+//     // 这会将直耦相位归零
+//     std::vector<gr_complex> calibration_factors(n_freq);
+//     for (int i = 0; i < n_freq; i++) {
+//         float mag = std::abs(leak_phasors[i]);
+//         if (mag > 1e-10f) {  // 避免除零
+//             calibration_factors[i] = std::conj(leak_phasors[i]) / mag;
+//         } else {
+//             calibration_factors[i] = gr_complex(1.0f, 0.0f);
+//             std::cout << "[ifft_range_profile] Warning: leakage magnitude too small at freq " 
+//                       << i << ", skipping calibration" << std::endl;
+//         }
+//     }
+
+//     // 3. 应用相位校准到所有距离单元
+//     std::cout << "[ifft_range_profile] Applying phase calibration..." << std::endl;
+//     for (int freq_idx = 0; freq_idx < n_freq; freq_idx++) {
+//         gr_complex cal_factor = calibration_factors[freq_idx];
+//         for (int range_idx = 0; range_idx < n_range; range_idx++) {
+//             pc_data[freq_idx][range_idx] *= cal_factor;
+//         }
+//     }
+
+//     // 4. 验证校准效果：检查校准后直耦相位
+//     std::cout << "[ifft_range_profile] Calibration verification:" << std::endl;
+//     for (int freq_idx = 0; freq_idx < n_freq; freq_idx++) {
+//         gr_complex calibrated_leakage = pc_data[freq_idx][leak_indices[freq_idx]];
+//         double phase_after = std::arg(calibrated_leakage);
+//         std::cout << "  Freq " << freq_idx << ": phase after calibration = " 
+//                   << phase_after << " rad (should be near 0)" << std::endl;
+//     }
+    
+//     std::cout << "[ifft_range_profile] Phase calibration complete" << std::endl;
+// }
 
 void ifft_range_profile_impl::perform_ifft_synthesis(
     const std::vector<std::vector<gr_complex>>& pc_data,
@@ -517,6 +607,136 @@ void ifft_range_profile_impl::perform_ifft_synthesis(
     }
 }
 
+void ifft_range_profile_impl::perform_frequency_domain_synthesis(
+    const std::map<double, std::vector<gr_complex>>& freq_data_map,
+    const std::vector<double>& freq_list,
+    const std::vector<gr_complex>& calibration_factors,
+    std::vector<gr_complex>& hrrp,
+    int& n_fft_fast)
+{
+    if (freq_data_map.empty() || freq_list.empty()) {
+        hrrp.clear();
+        return;
+    }
+
+    int n_pulse_cpi = freq_list.size();
+    int n_pri = static_cast<int>(d_sample_rate / d_prf);
+    
+    std::cout << "[ifft_range_profile] Starting frequency domain synthesis..." << std::endl;
+    std::cout << "  n_pri=" << n_pri << ", n_pulse_cpi=" << n_pulse_cpi << std::endl;
+
+    // 1. 生成参考信号的频谱（匹配滤波器）
+    int n_samp_pulse = static_cast<int>(d_pulse_width * d_sample_rate);
+    double start_freq = -d_bandwidth / 2.0;
+    
+    // 生成时域LFM参考信号
+    std::vector<gr_complex> ref_signal(n_pri, gr_complex(0, 0));
+    for (int i = 0; i < n_samp_pulse; i++) {
+        double t = i / d_sample_rate;
+        double phase = 2.0 * M_PI * (start_freq * t + (d_bandwidth / (2.0 * d_pulse_width)) * t * t);
+        ref_signal[i] = gr_complex(std::cos(phase), std::sin(phase));
+    }
+    
+    // FFT得到参考频谱
+    af::array ref_af(n_pri, reinterpret_cast<const af::cfloat*>(ref_signal.data()));
+    af::array ref_spec = af::fft(ref_af);
+    ref_spec = af::shift(ref_spec, n_pri / 2);  // fftshift
+    
+    // 生成频域遮罩（带宽限制）
+    std::vector<float> mask_data(n_pri, 0.0f);
+    double df_bin = d_sample_rate / n_pri;
+    for (int i = 0; i < n_pri; i++) {
+        double f = (i - n_pri / 2.0) * df_bin;
+        if (std::abs(f) <= d_bandwidth / 2.0 * 1.2) {
+            mask_data[i] = 1.0f;
+        }
+    }
+    af::array ref_mask(n_pri, mask_data.data());
+    
+    // 2. 计算合成参数
+    double df_step = (n_pulse_cpi > 1) ? (freq_list[1] - freq_list[0]) : d_bandwidth;
+    double total_bw = (n_pulse_cpi - 1) * std::abs(df_step) + d_bandwidth;
+    double fs_high_req = total_bw * 2.0;  // 2倍过采样
+    int k_up = static_cast<int>(std::ceil(fs_high_req / d_sample_rate));
+    double fs_high = k_up * d_sample_rate;
+    int l_high = n_pri * k_up;
+    
+    n_fft_fast = l_high;  // 返回合成后的大小
+    
+    std::cout << "  Total BW: " << total_bw / 1e6 << " MHz" << std::endl;
+    std::cout << "  Synthesis Fs: " << fs_high / 1e6 << " MHz (K=" << k_up << ")" << std::endl;
+    std::cout << "  Synthesis length: " << l_high << " samples" << std::endl;
+    
+    // 3. 初始化总频谱（校准后）
+    std::vector<gr_complex> spec_total(l_high, gr_complex(0, 0));
+    
+    // 4. 逐脉冲处理
+    for (int n = 0; n < n_pulse_cpi; n++) {
+        double freq = freq_list[n];
+        auto it = freq_data_map.find(freq);
+        if (it == freq_data_map.end()) {
+            std::cerr << "[ifft_range_profile] Missing data for freq " << freq / 1e9 << " GHz" << std::endl;
+            continue;
+        }
+        
+        const std::vector<gr_complex>& echo_pulse = it->second;
+        if (echo_pulse.size() < static_cast<size_t>(n_pri)) {
+            std::cerr << "[ifft_range_profile] Insufficient data at freq " << n << std::endl;
+            continue;
+        }
+        
+        // (1) FFT到频域
+        af::array echo_af(n_pri, reinterpret_cast<const af::cfloat*>(echo_pulse.data()));
+        af::array echo_spec = af::fft(echo_af);
+        echo_spec = af::shift(echo_spec, n_pri / 2);  // fftshift
+        
+        // (2) 频域脉压：MF_Spec = Echo_Spec * conj(Ref_Spec) * Mask
+        af::array mf_spec = echo_spec * af::conjg(ref_spec) * ref_mask;
+        
+        // (3) 扩展到高采样率数组
+        std::vector<gr_complex> s_expanded(l_high, gr_complex(0, 0));
+        std::vector<gr_complex> mf_spec_host(n_pri);
+        mf_spec.host(reinterpret_cast<af::cfloat*>(mf_spec_host.data()));
+        
+        int center_start = (l_high - n_pri) / 2;
+        for (int i = 0; i < n_pri; i++) {
+            s_expanded[center_start + i] = mf_spec_host[i];
+        }
+        
+        // (4) 频域搬移
+        double freq_offset = freq - freq_list[0];
+        int shift_bins = static_cast<int>(std::round(freq_offset / df_bin));
+        
+        // 循环移位
+        std::vector<gr_complex> s_shifted(l_high);
+        for (int i = 0; i < l_high; i++) {
+            int src_idx = (i - shift_bins + l_high) % l_high;
+            s_shifted[i] = s_expanded[src_idx];
+        }
+        
+        // (5) 累加（应用相位校准）
+        gr_complex cal_factor = (n < static_cast<int>(calibration_factors.size())) ? 
+                                 calibration_factors[n] : gr_complex(1, 0);
+        
+        for (int i = 0; i < l_high; i++) {
+            spec_total[i] += s_shifted[i] * cal_factor;
+        }
+        
+        std::cout << "  Processed freq " << n << ": " << freq / 1e9 << " GHz, shift=" << shift_bins << " bins" << std::endl;
+    }
+    
+    // 5. IFFT得到时域结果
+    af::array spec_total_af(l_high, reinterpret_cast<const af::cfloat*>(spec_total.data()));
+    spec_total_af = af::shift(spec_total_af, -l_high / 2);  // ifftshift
+    af::array result_af = af::ifft(spec_total_af);
+    
+    // 复制结果
+    hrrp.resize(l_high);
+    result_af.host(reinterpret_cast<af::cfloat*>(hrrp.data()));
+    
+    std::cout << "[ifft_range_profile] Frequency domain synthesis complete: " << hrrp.size() << " samples" << std::endl;
+}
+
 void ifft_range_profile_impl::process_sweep()
 {
     // 在独立线程中处理，需要确保 ArrayFire 后端已正确设置
@@ -577,74 +797,181 @@ void ifft_range_profile_impl::process_sweep()
         return;
     }
 
-    // 执行IFFT合成
-    std::vector<gr_complex> hrrp;
-    perform_ifft_synthesis(pulse_compressed, hrrp);
-
-    std::cout << "[ifft_range_profile] IFFT synthesis complete: " 
-              << hrrp.size() << " samples" << std::endl;
-
-    // 寻找最强的粗距离门
-    int n_fft_fast = pulse_compressed[0].size();
-    std::vector<double> coarse_profile(n_fft_fast);
+    // ===== 相位校准 =====
+    // 计算距离步长：基于采样率（过采样）
+    double range_step = SPEED_OF_LIGHT / (2.0 * d_sample_rate);
     
-    for (int i = 0; i < n_fft_fast; i++) {
-        double max_val = 0.0;
-        for (size_t j = 0; j < pulse_compressed.size(); j++) {
-            double val = std::abs(pulse_compressed[j][i]);
-            if (val > max_val) max_val = val;
+    // 提取校准因子（基于脉冲压缩结果中的直耦峰值）
+    int search_range_bins = static_cast<int>(171);  // 搜索前10米
+    search_range_bins = std::max(10, std::min(search_range_bins, static_cast<int>(pulse_compressed[0].size() / 2)));
+    
+    std::cout << "[ifft_range_profile] Extracting calibration factors (search range: " 
+              << search_range_bins << " bins)" << std::endl;
+    
+    // 提取直耦相位（不修改数据）
+    int n_freq = pulse_compressed.size();
+    std::vector<gr_complex> calibration_factors(n_freq);
+    
+    for (int freq_idx = 0; freq_idx < n_freq; freq_idx++) {
+        // 在当前频点的前 search_range_bins 个距离单元中找最大值
+        double max_magnitude = 0.0;
+        int max_idx = 0;
+        
+        for (int range_idx = 0; range_idx < search_range_bins && range_idx < static_cast<int>(pulse_compressed[freq_idx].size()); range_idx++) {
+            double mag = std::abs(pulse_compressed[freq_idx][range_idx]);
+            if (mag > max_magnitude) {
+                max_magnitude = mag;
+                max_idx = range_idx;
+            }
         }
-        coarse_profile[i] = max_val;
+        
+        gr_complex leak_phasor = pulse_compressed[freq_idx][max_idx];
+        float mag = std::abs(leak_phasor);
+        if (mag > 1e-10f) {
+            calibration_factors[freq_idx] = std::conj(leak_phasor) / mag;
+        } else {
+            calibration_factors[freq_idx] = gr_complex(1.0f, 0.0f);
+        }
+        
+        std::cout << "  Freq " << freq_idx << ": leakage at bin " << max_idx 
+                  << ", phase=" << std::arg(leak_phasor) << " rad" << std::endl;
     }
 
-    // 找到峰值位置
-    int max_idx = 0;
+    // ===== 频域合成（新算法）=====
+    std::vector<gr_complex> hrrp;
+    int n_fft_fast = 0;  // 将由频域合成函数返回
+    perform_frequency_domain_synthesis(d_freq_data, d_expected_freqs, calibration_factors, hrrp, n_fft_fast);
+
+    std::cout << "[ifft_range_profile] Frequency domain synthesis complete: " 
+              << hrrp.size() << " samples" << std::endl;
+
+    // 检查结果
+    if (hrrp.empty() || n_fft_fast == 0) {
+        std::cerr << "[ifft_range_profile] Synthesis failed" << std::endl;
+        d_freq_data.clear();
+        return;
+    }
+
+    // 频域合成后，hrrp是一维高分辨距离像
+    // 计算新的距离步长（基于合成后的采样率）
+    double df_step = (n_pulse_cpi > 1) ? std::abs(d_expected_freqs[1] - d_expected_freqs[0]) : d_bandwidth;
+    double total_bw = (n_pulse_cpi - 1) * df_step + d_bandwidth;
+    double fs_high_req = total_bw * 2.0;
+    int k_up = static_cast<int>(std::ceil(fs_high_req / d_sample_rate));
+    double fs_high = k_up * d_sample_rate;
+    double range_step_high = SPEED_OF_LIGHT / (2.0 * fs_high);
+    
+    // 寻找最强峰值（避开直耦）
+    int search_start = static_cast<int>(10.0 / range_step_high);  // 跳过前10米
+    int max_idx = search_start;
     double max_val = 0.0;
-    for (int i = 0; i < n_fft_fast; i++) {
-        if (coarse_profile[i] > max_val) {
-            max_val = coarse_profile[i];
+    for (int i = search_start; i < n_fft_fast && i < static_cast<int>(hrrp.size()); i++) {
+        double val = std::abs(hrrp[i]);
+        if (val > max_val) {
+            max_val = val;
             max_idx = i;
         }
     }
-
-    // 提取该粗距离门的精细距离像
-    std::vector<double> fine_profile(d_n_fft_synthesis);
-    for (int i = 0; i < d_n_fft_synthesis; i++) {
-        fine_profile[i] = std::abs(hrrp[max_idx * d_n_fft_synthesis + i]);
-    }
-
-    // 计算距离轴
-    double coarse_res = SPEED_OF_LIGHT / (2.0 * d_bandwidth);
-    double fine_window = SPEED_OF_LIGHT / (2.0 * std::abs(d_sweep_step));
     
-    std::cout << "[ifft_range_profile] Peak at coarse bin " << max_idx 
-              << ", range ~" << max_idx * coarse_res << " m" << std::endl;
+    double peak_range = max_idx * range_step_high;
+    
+    std::cout << "[ifft_range_profile] Peak at bin " << max_idx 
+              << ", range ~" << peak_range << " m" << std::endl;
     std::cout << "[ifft_range_profile] Theoretical resolution: " 
-              << SPEED_OF_LIGHT / (2.0 * n_pulse_cpi * std::abs(d_sweep_step)) 
+              << SPEED_OF_LIGHT / (2.0 * total_bw) 
               << " m" << std::endl;
 
     // 发送到GUI
     if (d_main_gui && !d_main_gui->is_closed()) {
-        RangeProfileUpdateEvent* event = new RangeProfileUpdateEvent();
-        event->setNumSamples(d_n_fft_synthesis);
+        // ===== 1. 发送1D距离像（峰值附近的局部切片）=====
+        // 提取峰值附近的一段用于细节显示
+        int window_size = 1024;  // 显示窗口大小
+        int slice_start = std::max(0, max_idx - window_size / 2);
+        int slice_end = std::min(n_fft_fast, max_idx + window_size / 2);
+        int slice_len = slice_end - slice_start;
         
-        // 精细距离轴
-        std::vector<double> range_axis(d_n_fft_synthesis);
-        double base_range = max_idx * coarse_res;
-        for (int i = 0; i < d_n_fft_synthesis; i++) {
-            range_axis[i] = base_range + (i * fine_window / d_n_fft_synthesis);
+        RangeProfileUpdateEvent* event = new RangeProfileUpdateEvent();
+        event->setNumSamples(slice_len);
+        
+        std::vector<double> range_axis(slice_len);
+        std::vector<double> fine_profile(slice_len);
+        for (int i = 0; i < slice_len; i++) {
+            range_axis[i] = (slice_start + i) * range_step_high;
+            fine_profile[i] = std::abs(hrrp[slice_start + i]);
         }
         
         event->setRangeProfile(range_axis, fine_profile);
         qApp->postEvent(d_main_gui, event);
+
+        // ===== 2. 发送2D HRRP热力图数据（使用脉冲压缩结果）=====
+        if (!pulse_compressed.empty()) {
+            HRRP2DUpdateEvent* event_2d = new HRRP2DUpdateEvent();
+            
+            // 使用脉冲压缩结果显示频率 x 距离的2D图
+            int n_freq_2d = pulse_compressed.size();
+            int n_range_2d = pulse_compressed[0].size();
+            
+            std::vector<double> hrrp_2d_data(n_freq_2d * n_range_2d);
+            
+            // 转换为 dB (绝对幅值)
+            for (int freq_idx = 0; freq_idx < n_freq_2d; freq_idx++) {
+                for (int range_idx = 0; range_idx < n_range_2d; range_idx++) {
+                    size_t src_idx = freq_idx * n_range_2d + range_idx;
+                    double amp = std::abs(pulse_compressed[freq_idx][range_idx]);
+                    double db_val = 20.0 * std::log10(amp + 1e-10);
+                    hrrp_2d_data[src_idx] = db_val;
+                }
+            }
+            
+            // 距离轴：基于采样率
+            std::vector<double> coarse_axis(n_range_2d);
+            for (int i = 0; i < n_range_2d; i++) {
+                coarse_axis[i] = i * range_step;
+            }
+            
+            // 频率轴（索引）
+            std::vector<double> fine_axis(n_freq_2d);
+            for (int i = 0; i < n_freq_2d; i++) {
+                fine_axis[i] = static_cast<double>(i);
+            }
+            
+            event_2d->setHRRP2DData(hrrp_2d_data, coarse_axis, fine_axis, 
+                                    n_range_2d, n_freq_2d);
+            qApp->postEvent(d_main_gui, event_2d);
+            
+            std::cout << "[ifft_range_profile] Sent 2D data: " 
+                      << n_range_2d << " x " << n_freq_2d << " (range x freq)" << std::endl;
+        }
+
+        // ===== 3. 发送拼接后的完整一维距离像（频域合成结果）=====
+        FullRangeProfileUpdateEvent* event_full = new FullRangeProfileUpdateEvent();
+        
+        // 计算精细分辨率
+        double fine_resolution = SPEED_OF_LIGHT / (2.0 * total_bw);
+        
+        // 频域合成后的hrrp就是完整的高分辨距离像
+        std::vector<double> full_range_axis(n_fft_fast);
+        std::vector<double> full_profile(n_fft_fast);
+        
+        for (int i = 0; i < n_fft_fast; i++) {
+            full_range_axis[i] = i * range_step_high;
+            double amp = std::abs(hrrp[i]);
+            full_profile[i] = 20.0 * std::log10(amp + 1e-10);  // dB
+        }
+        
+        event_full->setFullRangeProfile(full_range_axis, full_profile, fine_resolution);
+        qApp->postEvent(d_main_gui, event_full);
+        
+        std::cout << "[ifft_range_profile] Sent full range profile: " 
+                  << n_fft_fast << " points, resolution=" << fine_resolution << " m" << std::endl;
     }
 
     // 清空数据准备下一次扫频
     d_freq_data.clear();
-    } catch (const std::exception& e) {
-        std::cerr << "[ifft_range_profile] Error in process_sweep: " << e.what() << std::endl;
     } catch (const af::exception& e) {
         std::cerr << "[ifft_range_profile] ArrayFire error in process_sweep: " << e.what() << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "[ifft_range_profile] Error in process_sweep: " << e.what() << std::endl;
     } catch (...) {
         std::cerr << "[ifft_range_profile] Unknown error in process_sweep" << std::endl;
     }

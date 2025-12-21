@@ -71,7 +71,14 @@ private:
                                    int n_pri);
     void perform_ifft_synthesis(const std::vector<std::vector<gr_complex>>& pc_data,
                                std::vector<gr_complex>& hrrp);
-
+    void perform_phase_calibration(std::vector<std::vector<gr_complex>>& pc_data,
+                               int search_range_bins);
+    void perform_frequency_domain_synthesis(
+                               const std::map<double, std::vector<gr_complex>>& freq_data_map,
+                               const std::vector<double>& freq_list,
+                               const std::vector<gr_complex>& calibration_factors,
+                               std::vector<gr_complex>& hrrp,
+                               int& n_fft_fast);
 public:
     ifft_range_profile_impl(double bandwidth,
                            double pulse_width,

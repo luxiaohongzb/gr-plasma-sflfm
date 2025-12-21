@@ -83,3 +83,52 @@ const std::vector<double>& PulseCompressionUpdateEvent::getProfile() const
 }
 
 double PulseCompressionUpdateEvent::getFrequency() const { return d_frequency; }
+
+// HRRP2DUpdateEvent implementation
+HRRP2DUpdateEvent::HRRP2DUpdateEvent()
+    : QEvent(QEvent::Type(HRRP2DUpdateEventType)), d_n_coarse(0), d_n_fine(0)
+{
+}
+
+HRRP2DUpdateEvent::~HRRP2DUpdateEvent() {}
+
+void HRRP2DUpdateEvent::setHRRP2DData(const std::vector<double>& data,
+                                       const std::vector<double>& coarse_axis,
+                                       const std::vector<double>& fine_axis,
+                                       size_t n_coarse,
+                                       size_t n_fine)
+{
+    d_data = data;
+    d_coarse_axis = coarse_axis;
+    d_fine_axis = fine_axis;
+    d_n_coarse = n_coarse;
+    d_n_fine = n_fine;
+}
+
+const std::vector<double>& HRRP2DUpdateEvent::getData() const { return d_data; }
+const std::vector<double>& HRRP2DUpdateEvent::getCoarseAxis() const { return d_coarse_axis; }
+const std::vector<double>& HRRP2DUpdateEvent::getFineAxis() const { return d_fine_axis; }
+size_t HRRP2DUpdateEvent::getNumCoarse() const { return d_n_coarse; }
+size_t HRRP2DUpdateEvent::getNumFine() const { return d_n_fine; }
+
+// FullRangeProfileUpdateEvent implementation
+FullRangeProfileUpdateEvent::FullRangeProfileUpdateEvent()
+    : QEvent(QEvent::Type(FullRangeProfileUpdateEventType)), d_fine_resolution(0.0)
+{
+}
+
+FullRangeProfileUpdateEvent::~FullRangeProfileUpdateEvent() {}
+
+void FullRangeProfileUpdateEvent::setFullRangeProfile(
+    const std::vector<double>& range_axis,
+    const std::vector<double>& profile,
+    double fine_resolution)
+{
+    d_range_axis = range_axis;
+    d_profile = profile;
+    d_fine_resolution = fine_resolution;
+}
+
+const std::vector<double>& FullRangeProfileUpdateEvent::getRangeAxis() const { return d_range_axis; }
+const std::vector<double>& FullRangeProfileUpdateEvent::getProfile() const { return d_profile; }
+double FullRangeProfileUpdateEvent::getFineResolution() const { return d_fine_resolution; }

@@ -278,15 +278,15 @@ blocks:
     minoutbuf: '0'
     rx_freq: 3.0e9
     rx_freq_key: core:rx_freq
-    rx_gain: '40'
+    rx_gain: '55'
     samp_rate: samp_rate
     sample_start_key: core:sample_start
     start_delay: '0.5'
-    step_delay: '1'
+    step_delay: '0.5'
     tx_freq: 3.0e9
     tx_freq_key: core:tx_freq
-    tx_gain: '40'
-    verbose: 'True'
+    tx_gain: '50'
+    verbose: 'False'
   states:
     bus_sink: false
     bus_source: false

@@ -115,12 +115,12 @@ bool sweep_collector_impl::check_sweep_complete()
     if (expected_freqs.empty())
         return false;
     
-    std::cout << "[sweep_collector] Checking sweep completeness: " << expected_freqs.size() << " expected, " << collected.size() << " collected" << std::endl;
+ //   std::cout << "[sweep_collector] Checking sweep completeness: " << expected_freqs.size() << " expected, " << collected.size() << " collected" << std::endl;
     
     for (double f : expected_freqs) {
         auto it = collected.find(f);
         if (it == collected.end()) {
-            std::cout << "[sweep_collector] Missing frequency: " << f << " Hz" << std::endl;
+           // std::cout << "[sweep_collector] Missing frequency: " << f << " Hz" << std::endl;
             // Try to find with tolerance (1 Hz)
             bool found = false;
             for (const auto& kv : collected) {
@@ -128,7 +128,7 @@ bool sweep_collector_impl::check_sweep_complete()
                //     std::cout << "[sweep_collector] Found frequency " << kv.first << " Hz (close to " << f << " Hz)" << std::endl;
                     found = true;
                     if (kv.second.empty()) {
-                        std::cout << "[sweep_collector] Frequency " << kv.first << " has empty data" << std::endl;
+          //              std::cout << "[sweep_collector] Frequency " << kv.first << " has empty data" << std::endl;
                         return false;
                     }
                     break;
@@ -138,13 +138,13 @@ bool sweep_collector_impl::check_sweep_complete()
                 return false;
             }
         } else if (it->second.empty()) {
-            std::cout << "[sweep_collector] Frequency " << f << " has empty data" << std::endl;
+        //    std::cout << "[sweep_collector] Frequency " << f << " has empty data" << std::endl;
             return false;
         } else {
-            std::cout << "[sweep_collector] Found frequency " << f << " Hz with " << it->second.size() << " samples" << std::endl;
+      //      std::cout << "[sweep_collector] Found frequency " << f << " Hz with " << it->second.size() << " samples" << std::endl;
         }
     }
-    std::cout << "[sweep_collector] All frequencies collected!" << std::endl;
+  //  std::cout << "[sweep_collector] All frequencies collected!" << std::endl;
     return true;
 }
  
@@ -155,7 +155,7 @@ bool sweep_collector_impl::check_sweep_complete()
  
      // Only write if we haven't reached the target number of sweeps yet
      if (sweep_count > save_every) {
-         std::cout << "[sweep_collector] Completed sweep " << sweep_count << " (limit reached, not writing)" << std::endl;
+       //  std::cout << "[sweep_collector] Completed sweep " << sweep_count << " (limit reached, not writing)" << std::endl;
          collected.clear();
          return;
      }
@@ -228,9 +228,9 @@ bool sweep_collector_impl::check_sweep_complete()
      // Print incoming metadata for debugging
      try {
          std::string meta_str = pmt::write_string(meta);
-         std::cout << "[sweep_collector] Received PDU meta: " << meta_str << std::endl;
+    //     std::cout << "[sweep_collector] Received PDU meta: " << meta_str << std::endl;
      } catch (...) {
-         std::cout << "[sweep_collector] Received PDU meta (unprintable)" << std::endl;
+    //     std::cout << "[sweep_collector] Received PDU meta (unprintable)" << std::endl;
      }
  
      pmt::pmt_t freq_pmt = pmt::dict_ref(meta, pmt::intern(freq_meta_key), pmt::PMT_NIL);
@@ -238,7 +238,7 @@ bool sweep_collector_impl::check_sweep_complete()
      if (freq_pmt != pmt::PMT_NIL) {
          try {
              freq = pmt::to_double(freq_pmt);
-             std::cout << "[sweep_collector] Parsed frequency meta (" << freq_meta_key << ") = " << freq << " Hz" << std::endl;
+        //     std::cout << "[sweep_collector] Parsed frequency meta (" << freq_meta_key << ") = " << freq << " Hz" << std::endl;
          } catch (...) {
              std::cout << "[sweep_collector] frequency meta present but cannot convert to double" << std::endl;
              return; // can't interpret frequency
@@ -254,7 +254,7 @@ bool sweep_collector_impl::check_sweep_complete()
      }
  
      size_t n = pmt::length(vec);
-     std::cout << "[sweep_collector] PDU sample count: " << n << std::endl;
+    // std::cout << "[sweep_collector] PDU sample count: " << n << std::endl;
      auto vec_data = pmt::c32vector_elements(vec);
      const gr_complex *data = vec_data.data();
      if (n > 0) {
@@ -278,7 +278,7 @@ bool sweep_collector_impl::check_sweep_complete()
         auto &bucket = collected[normalized_freq];
         bucket.clear();  // Clear old data
         bucket.insert(bucket.end(), data, data + n);  // Insert new data
-        std::cout << "[sweep_collector] Stored " << n << " samples for frequency " << normalized_freq << " Hz (original: " << freq << " Hz)" << std::endl;
+   //     std::cout << "[sweep_collector] Stored " << n << " samples for frequency " << normalized_freq << " Hz (original: " << freq << " Hz)" << std::endl;
     }
 
      // Forward the message to output port for ifft_range_profile
