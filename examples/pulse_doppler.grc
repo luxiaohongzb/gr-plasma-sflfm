@@ -266,7 +266,7 @@ blocks:
   parameters:
     affinity: ''
     alias: ''
-    args: serial_no = 8001093
+    args: serial_no =8001093
     cal_file: ''
     comment: ''
     elevate_priority: 'True'
@@ -278,11 +278,11 @@ blocks:
     minoutbuf: '0'
     rx_freq: 3.0e9
     rx_freq_key: core:rx_freq
-    rx_gain: '55'
+    rx_gain: '50'
     samp_rate: samp_rate
     sample_start_key: core:sample_start
     start_delay: '0.5'
-    step_delay: '0.5'
+    step_delay: '0.2'
     tx_freq: 3.0e9
     tx_freq_key: core:tx_freq
     tx_gain: '50'
