@@ -8,6 +8,7 @@
 #include <QColor>
 #include <QBrush>
 #include <QFont>
+#include <QTimer>
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -63,7 +64,10 @@ RangePlotWidget::RangePlotWidget(const QString& title,
       d_x_min_auto(0.0),
       d_x_max_auto(1000.0),
       d_y_min_auto(0.0),
-      d_y_max_auto(1.0)
+      d_y_max_auto(1.0),
+      d_peak_markers_enabled(false),
+      d_peak_count(10),
+      d_x_offset(-630)
 {
     // 创建主布局
     d_main_layout = new QVBoxLayout(this);
@@ -168,6 +172,42 @@ RangePlotWidget::RangePlotWidget(const QString& title,
     // d_zoom_out_btn = new QPushButton("缩小", this);
 
     connect(d_reset_btn, &QPushButton::clicked, this, &RangePlotWidget::onResetView);
+
+    // 峰值标记控件
+    d_peak_enable_checkbox = new QCheckBox("显示峰值", this);
+    d_peak_count_label = new QLabel("峰值个数:", this);
+    d_peak_count_combo = new QComboBox(this);
+    d_peak_count_combo->addItem("1", 1);
+    d_peak_count_combo->addItem("2", 2);
+    d_peak_count_combo->addItem("3", 3);
+    d_peak_count_combo->addItem("5", 5);
+    d_peak_count_combo->addItem("10", 10);
+    d_peak_count_combo->setCurrentIndex(4);  // 默认10个
+    d_peak_count_combo->setEnabled(false);  // 初始禁用
+
+    connect(d_peak_enable_checkbox, &QCheckBox::toggled, this, &RangePlotWidget::onPeakMarkersToggled);
+    connect(d_peak_count_combo, QOverload<int>::of(&QComboBox::currentIndexChanged), 
+            this, &RangePlotWidget::onPeakCountChanged);
+
+    // X轴校准控件
+    d_x_offset_label = new QLabel("X轴校准偏移(m):", this);
+    d_x_offset_spin = new QDoubleSpinBox(this);
+    d_x_offset_spin->setRange(-10000.0, 10000.0);
+    d_x_offset_spin->setDecimals(2);
+    d_x_offset_spin->setSingleStep(0.1);
+    d_x_offset_spin->setValue(-630);
+    d_x_offset_spin->setToolTip("设置X轴零点偏移量");
+    
+    d_x_offset_apply_btn = new QPushButton("应用校准", this);
+    d_x_offset_apply_btn->setStyleSheet("QPushButton { background-color: #4CAF50; color: white; padding: 5px; font-weight: bold; }");
+    d_x_offset_apply_btn->setToolTip("应用X轴偏移校准");
+    
+    d_x_offset_reset_btn = new QPushButton("重置校准", this);
+    d_x_offset_reset_btn->setStyleSheet("QPushButton { background-color: #FF9800; color: white; padding: 5px; font-weight: bold; }");
+    d_x_offset_reset_btn->setToolTip("将X轴偏移重置为0");
+
+    connect(d_x_offset_apply_btn, &QPushButton::clicked, this, &RangePlotWidget::onApplyXOffset);
+    connect(d_x_offset_reset_btn, &QPushButton::clicked, this, &RangePlotWidget::onResetXOffset);
     // connect(d_zoom_in_btn, &QPushButton::clicked, this, [this]() {
     //     // 使用 zoomer 进行缩放
     //     QRectF rect = d_zoomer->zoomRect();
@@ -209,6 +249,17 @@ RangePlotWidget::RangePlotWidget(const QString& title,
     d_control_layout->addWidget(d_reset_btn);
     // d_control_layout->addWidget(d_zoom_in_btn);
     // d_control_layout->addWidget(d_zoom_out_btn);
+    d_control_layout->addSpacing(20);
+    
+    d_control_layout->addWidget(d_peak_enable_checkbox);
+    d_control_layout->addWidget(d_peak_count_label);
+    d_control_layout->addWidget(d_peak_count_combo);
+    d_control_layout->addSpacing(20);
+    
+    d_control_layout->addWidget(d_x_offset_label);
+    d_control_layout->addWidget(d_x_offset_spin);
+    d_control_layout->addWidget(d_x_offset_apply_btn);
+    d_control_layout->addWidget(d_x_offset_reset_btn);
     d_control_layout->addStretch();
 
     d_control_group->setLayout(d_control_layout);
@@ -235,11 +286,13 @@ RangePlotWidget::~RangePlotWidget()
 
 void RangePlotWidget::updateData(const std::vector<double>& x_data, const std::vector<double>& y_data)
 {
+    d_x_data_raw.clear();
     d_x_data.clear();
     d_y_data.clear();
     
     for (size_t i = 0; i < x_data.size() && i < y_data.size(); i++) {
-        d_x_data.append(x_data[i]);
+        d_x_data_raw.append(x_data[i]);
+        d_x_data.append(x_data[i] + d_x_offset);  // 应用偏移
         d_y_data.append(y_data[i]);
     }
     
@@ -248,8 +301,15 @@ void RangePlotWidget::updateData(const std::vector<double>& x_data, const std::v
 
 void RangePlotWidget::updateData(const QVector<double>& x_data, const QVector<double>& y_data)
 {
-    d_x_data = x_data;
+    d_x_data_raw = x_data;
+    d_x_data.clear();
     d_y_data = y_data;
+    
+    // 应用X轴偏移
+    for (int i = 0; i < x_data.size(); i++) {
+        d_x_data.append(x_data[i] + d_x_offset);
+    }
+    
     updatePlot();
 }
 
@@ -388,9 +448,196 @@ void RangePlotWidget::updatePlot()
         onAutoYRange();
     }
 
+    // 更新峰值标记
+    if (d_peak_markers_enabled) {
+        findAndMarkPeaks();
+    }
+
     // 重绘
     d_plot->replot();
     d_zoomer->setZoomBase();
+}
+
+void RangePlotWidget::enablePeakMarkers(bool enable)
+{
+    d_peak_markers_enabled = enable;
+    d_peak_enable_checkbox->setChecked(enable);
+    d_peak_count_combo->setEnabled(enable);
+    
+    if (enable) {
+        findAndMarkPeaks();
+    } else {
+        // 清除所有峰值标记
+        for (auto marker : d_peak_markers) {
+            marker->detach();
+            delete marker;
+        }
+        d_peak_markers.clear();
+    }
+    
+    d_plot->replot();
+}
+
+void RangePlotWidget::setPeakCount(int count)
+{
+    d_peak_count = count;
+    
+    // 更新下拉框显示
+    for (int i = 0; i < d_peak_count_combo->count(); i++) {
+        if (d_peak_count_combo->itemData(i).toInt() == count) {
+            d_peak_count_combo->setCurrentIndex(i);
+            break;
+        }
+    }
+    
+    if (d_peak_markers_enabled) {
+        findAndMarkPeaks();
+        d_plot->replot();
+    }
+}
+
+void RangePlotWidget::onPeakMarkersToggled(bool checked)
+{
+    enablePeakMarkers(checked);
+}
+
+void RangePlotWidget::onPeakCountChanged(int index)
+{
+    int count = d_peak_count_combo->itemData(index).toInt();
+    d_peak_count = count;
+    
+    if (d_peak_markers_enabled) {
+        findAndMarkPeaks();
+        d_plot->replot();
+    }
+}
+
+void RangePlotWidget::onApplyXOffset()
+{
+    double new_offset = d_x_offset_spin->value();
+    
+    if (std::abs(new_offset - d_x_offset) < 1e-6) {
+        // 偏移量没有变化
+        return;
+    }
+    
+    d_x_offset = new_offset;
+    
+    // 重新应用偏移到X轴数据
+    d_x_data.clear();
+    for (int i = 0; i < d_x_data_raw.size(); i++) {
+        d_x_data.append(d_x_data_raw[i] + d_x_offset);
+    }
+    
+    // 更新绘图
+    updatePlot();
+    
+    std::cout << "[RangePlotWidget] Applied X-axis offset: " << d_x_offset << " m" << std::endl;
+    
+    // 显示提示信息
+    d_x_offset_apply_btn->setText("已应用");
+    QTimer::singleShot(1000, [this]() {
+        d_x_offset_apply_btn->setText("应用校准");
+    });
+}
+
+void RangePlotWidget::onResetXOffset()
+{
+    d_x_offset = 0.0;
+    d_x_offset_spin->setValue(0.0);
+    
+    // 恢复原始X轴数据
+    d_x_data.clear();
+    for (int i = 0; i < d_x_data_raw.size(); i++) {
+        d_x_data.append(d_x_data_raw[i]);
+    }
+    
+    // 更新绘图
+    updatePlot();
+    
+    std::cout << "[RangePlotWidget] Reset X-axis offset to 0" << std::endl;
+    
+    // 显示提示信息
+    d_x_offset_reset_btn->setText("已重置");
+    QTimer::singleShot(1000, [this]() {
+        d_x_offset_reset_btn->setText("重置校准");
+    });
+}
+
+void RangePlotWidget::findAndMarkPeaks()
+{
+    // 清除旧的峰值标记
+    for (auto marker : d_peak_markers) {
+        marker->detach();
+        delete marker;
+    }
+    d_peak_markers.clear();
+    
+    if (d_x_data.isEmpty() || d_y_data.isEmpty()) {
+        return;
+    }
+    
+    // 创建索引和值的对应关系
+    std::vector<std::pair<int, double>> peaks;
+    for (int i = 0; i < d_y_data.size(); i++) {
+        peaks.push_back({i, d_y_data[i]});
+    }
+    
+    // 按值降序排序
+    std::sort(peaks.begin(), peaks.end(), 
+              [](const std::pair<int, double>& a, const std::pair<int, double>& b) {
+                  return a.second > b.second;
+              });
+    
+    // 取前N个峰值
+    int num_peaks = std::min(d_peak_count, static_cast<int>(peaks.size()));
+    
+    // 为每个峰值创建标记
+    for (int i = 0; i < num_peaks; i++) {
+        int idx = peaks[i].first;
+        double x_val = d_x_data[idx];
+        double y_val = d_y_data[idx];
+        
+        // 创建峰值标记
+        QwtPlotMarker* marker = new QwtPlotMarker();
+        
+        // 设置标记位置
+        marker->setValue(x_val, y_val);
+        
+        // 设置标记样式（红色圆点）
+        QwtSymbol* symbol = new QwtSymbol(QwtSymbol::Ellipse);
+        symbol->setSize(12, 12);
+        symbol->setPen(QPen(Qt::red, 2));
+        symbol->setBrush(QBrush(Qt::red));
+        marker->setSymbol(symbol);
+        
+        // 设置标签文字
+        QString label = QString("#%1\nX: %2\nY: %3")
+                       .arg(i + 1)
+                       .arg(x_val, 0, 'f', 2)
+                       .arg(y_val, 0, 'f', 2);
+        
+        QwtText text(label);
+        text.setFont(QFont("Arial", 9, QFont::Bold));
+        text.setColor(Qt::red);
+        
+        QColor bg(Qt::white);
+        bg.setAlpha(200);
+        text.setBackgroundBrush(QBrush(bg));
+        text.setBorderPen(QPen(Qt::red, 1));
+        text.setBorderRadius(3);
+        
+        marker->setLabel(text);
+        marker->setLabelAlignment(Qt::AlignTop | Qt::AlignRight);
+        
+        // 添加到绘图
+        marker->attach(d_plot);
+        d_peak_markers.push_back(marker);
+        
+        std::cout << "[RangePlotWidget] Peak #" << (i+1) 
+                  << " at X=" << x_val 
+                  << ", Y=" << y_val << std::endl;
+    }
 }
 
 } // namespace plasma

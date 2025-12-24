@@ -14,6 +14,8 @@
 #include <qwt/qwt_plot_panner.h>
 #include <qwt/qwt_plot_magnifier.h>
 #include <qwt/qwt_plot_picker.h>
+#include <qwt/qwt_plot_marker.h>
+#include <qwt/qwt_symbol.h>
 #include <qwt/qwt_event_pattern.h>
 #include <qwt/qwt_text.h>
 #include <qwt/qwt_picker_machine.h>
@@ -27,6 +29,8 @@
 #include <QGroupBox>
 #include <QButtonGroup>
 #include <QRadioButton>
+#include <QCheckBox>
+#include <QComboBox>
 
 #include <vector>
 #include <string>
@@ -120,6 +124,16 @@ public:
      */
     void resetView();
 
+    /**
+     * @brief 启用/禁用峰值标记
+     */
+    void enablePeakMarkers(bool enable);
+
+    /**
+     * @brief 设置要显示的峰值数量
+     */
+    void setPeakCount(int count);
+
 public slots:
     /**
      * @brief 手动设置X轴范围
@@ -146,7 +160,31 @@ public slots:
      */
     void onResetView();
 
+    /**
+     * @brief 峰值显示开关
+     */
+    void onPeakMarkersToggled(bool checked);
+
+    /**
+     * @brief 峰值数量改变
+     */
+    void onPeakCountChanged(int index);
+
+    /**
+     * @brief 应用X轴校准偏移
+     */
+    void onApplyXOffset();
+
+    /**
+     * @brief 重置X轴校准
+     */
+    void onResetXOffset();
+
 private:
+    /**
+     * @brief 查找并标记峰值
+     */
+    void findAndMarkPeaks();
     // Qwt plot objects
     QwtPlot* d_plot;
     QwtPlotCurve* d_curve;
@@ -155,6 +193,7 @@ private:
     QwtPlotPanner* d_panner;
     QwtPlotMagnifier* d_magnifier;
     QwtPlotPicker* d_picker;  // 用于鼠标悬停显示坐标
+    std::vector<QwtPlotMarker*> d_peak_markers;  // 峰值标记
 
     // Control widgets
     QGroupBox* d_control_group;
@@ -181,12 +220,24 @@ private:
     // QPushButton* d_zoom_in_btn;
     // QPushButton* d_zoom_out_btn;
 
+    // Peak marker controls
+    QCheckBox* d_peak_enable_checkbox;
+    QLabel* d_peak_count_label;
+    QComboBox* d_peak_count_combo;
+
+    // X axis calibration controls
+    QLabel* d_x_offset_label;
+    QDoubleSpinBox* d_x_offset_spin;
+    QPushButton* d_x_offset_apply_btn;
+    QPushButton* d_x_offset_reset_btn;
+
     // Layout
     QVBoxLayout* d_main_layout;
 
     // Data storage
     QVector<double> d_x_data;
     QVector<double> d_y_data;
+    QVector<double> d_x_data_raw;  // 原始X轴数据（未校准）
 
     // State
     bool d_auto_x_range;
@@ -195,6 +246,9 @@ private:
     double d_x_max_auto;
     double d_y_min_auto;
     double d_y_max_auto;
+    bool d_peak_markers_enabled;
+    int d_peak_count;
+    double d_x_offset;  // X轴偏移量（校准值）
 
     void updateAxisControls();
     void updatePlot();
